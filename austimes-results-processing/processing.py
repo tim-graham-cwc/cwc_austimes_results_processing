@@ -1,7 +1,9 @@
 from datetime import datetime
 import pytz
 import pandas as pd
+import openpyxl
 import warnings
+from directories import Directories
 
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
@@ -23,9 +25,14 @@ INPUT_ELCG_FILENAME = "CORE_Elec capacity and generation.csv"
 INPUT_EnEff_IND_FILENAME = "CORE-EnEff Industry.csv"
 INPUT_EnEff_BLD_FILENAME = "CORE-EnEff Buildings.csv"
 INPUT_H2GC_FILENAME = "CORE_H2 capacity and generation.csv"
-INPUT_PATH = "inputs/"
-OUTPUT_PATH = "outputs/"
-MAPPING_PATH = "mapping/"
+
+
+
+###Set directories
+directories = Directories()
+INPUT_PATH = directories.INPUT_PATH
+OUTPUT_PATH = directories.OUTPUT_PATH
+MAPPING_PATH = directories.MAPPING_PATH
 
 
 
