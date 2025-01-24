@@ -1,0 +1,19 @@
+subsector_p,subsector
+Appt,Apartment
+Shou,House
+Thou,Townhouse
+Age_Care,Age Care
+Dat_Cen,Data Centre
+Hosp,Hospital
+Hotel,Hotel
+Law_Cour,Law Court
+Office,Office
+Pub_Bldg,Public Building
+Retail,Retail
+School,School
+SupMkt,Supermarket
+Tertiary,Tertiary
+-,-
+Appartment,Apartment
+SingleHouse,House
+TownHouse,Townhouse
