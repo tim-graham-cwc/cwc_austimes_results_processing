@@ -1,0 +1,12 @@
+process_code,tech_detail
+StmTurb,Steam turbine
+CCGT,Closed cycle gas turbine
+Cogen,Cogeneration
+OCGT,Open cycle gas turbine
+WinONS,Onshore wind
+WinOFS,Offshore wind
+WinOFSFxd,Offshore wind
+Wind,Onshore wind
+NatGas,Reciprocating engine
+ReProEng,Reciprocating engine
+REGAS,Reciprocating engine

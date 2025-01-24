@@ -1,0 +1,82 @@
+subsector_detail,subsector
+Air domestic,Air transport
+Air international,Air transport
+Coastal bunkers,Marine transport
+International bunkers,Marine transport
+Other transport,Other transport
+Rail,Rail
+Articulated vehicles,Articulated vehicles
+Bus,Bus
+Light commercial vehicle - large,Light commercial vehicle
+Light commercial vehicle - medium,Light commercial vehicle
+Light commercial vehicle - small,Light commercial vehicle
+Motorcycle,Motorcycle
+Passenger vehicle - large,Passenger vehicle
+Passenger vehicle - medium,Passenger vehicle
+Passenger vehicle - small,Passenger vehicle
+Rigid trucks,Rigid trucks
+Agricultural services and fishing,Agriculture
+Alumina,Manufacturing
+Aluminium,Manufacturing
+Ammonia,Chemicals
+Bauxite mining,Mining
+Cement,Manufacturing
+Coal mining,Mining
+Construction services,Other industry
+Copper mining,Mining
+Dairy,Agriculture
+Explosives,Chemicals
+Fertilisers,Chemicals
+Forestry and logging,Forestry and logging
+Gas export (LNG),Mining
+Gas mining,Mining
+Gas supply,Other industry
+Grains,Agriculture
+Iron and steel - BF,Iron and steel
+Iron and steel - DRI,Iron and steel
+Iron and steel - EAF,Iron and steel
+Iron and steel - MBOF,Iron and steel
+Iron and steel - H2 Drive,Iron and steel
+Iron and steel - Electrolysis,Iron and steel
+Iron ore mining,Mining
+Lithium mining,Mining
+Meat products,Manufacturing
+Motor vehicle and parts,Manufacturing
+Nickel mining,Mining
+Non-ferrous metal ores,Mining
+Non-metallic construction materials (not cement),Manufacturing
+Oil mining,Mining
+Other agriculture,Agriculture
+Other animals,Agriculture
+Other chemicals,Chemicals
+Other food and drink products,Manufacturing
+Other manufacturing products,Manufacturing
+Other metal products,Manufacturing
+Other mining,Mining
+Other non-ferrous metals,Manufacturing
+Paper products,Manufacturing
+Petroleum refinery,Manufacturing
+Refridgeration and AirCon,Other industry
+Rubber and plastic products,Chemicals
+Sheep and Cattle,Agriculture
+"Textiles, clothing and footwear",Manufacturing
+Waste,Other industry
+Water supply,Other industry
+Wood products,Manufacturing
+Zinc mining,Mining
+Unknown,Unknown
+Art. Vehicles,Articulated vehicles
+LCV - large,Light commercial vehicle
+LCV - medium,Light commercial vehicle
+LCV - small,Light commercial vehicle
+Pass - large,Passenger vehicle
+Pass - medium,Passenger vehicle
+Pass - small,Passenger vehicle
+-,-
+"Water supply, sewerage and drainage services",Other industry
+Construction,Other industry
+Iron and steel - H2DRI,Iron and steel
+Iron and steel - Ele,Iron and steel
+Forestry,Agriculture
+Unassigned energy emissions,Unassigned energy emissions
+Printing and publishing,Manufacturing
