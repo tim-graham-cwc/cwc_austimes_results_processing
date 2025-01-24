@@ -2,11 +2,11 @@
 /austimes-results-processing/inputs/CORE-EnEff Buildings.csv
 /austimes-results-processing/inputs/CORE-EnEff Industry.csv
 /austimes-results-processing/inputs/CORE_Elec capacity and generation.csv
-/austimes-results-processing/outputs/2025-01-24_12-26/Combined_results.xlsx
 /austimes-results-processing/inputs/CORE_emis_detail.csv
 /austimes-results-processing/inputs/CORE_Fin energy Commercial.csv
 /austimes-results-processing/inputs/CORE_Fin energy Industry.csv
 /austimes-results-processing/inputs/CORE_Fin energy Transport.csv
 /austimes-results-processing/inputs/CORE_H2 capacity and generation.csv
+/austimes-results-processing/inputs/Elec fuels.csv.csv
 /austimes-results-processing/outputs/*
 
