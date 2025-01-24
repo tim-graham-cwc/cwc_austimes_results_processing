@@ -1,7 +1,6 @@
 from datetime import datetime
 import pytz
 import pandas as pd
-import openpyxl
 import warnings
 from directories import Directories
 
