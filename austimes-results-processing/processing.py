@@ -26,7 +26,6 @@ INPUT_EnEff_BLD_FILENAME = "CORE-EnEff Buildings.csv"
 INPUT_H2GC_FILENAME = "CORE_H2 capacity and generation.csv"
 
 
-
 ###Set directories
 directories = Directories()
 INPUT_PATH = directories.INPUT_PATH
@@ -418,9 +417,7 @@ energy_ind["energy_demand"] = energy_ind["val"]*energy_ind["EInt"]
 energy_ind_fs = energy_ind
 
 ## Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail',
-                      #'process', #
-                      'fuel_type','unit','year']
+cols = common_cols + ['sector','subsector','subsector_detail','fuel_type','unit','year']
 energy_sum_ind = energy_ind.groupby(cols, sort=True)['energy_demand'].sum()
 energy_sum_ind_df = energy_sum_ind.to_frame()
 energy_summary_ind = pd.pivot_table(energy_sum_ind_df, values='energy_demand',index=cols[:-1], columns='year', aggfunc='sum')
@@ -434,9 +431,7 @@ energy_summary_ind = energy_summary_ind.reset_index()
 energy_ind_fs = energy_ind_fs.drop(energy_ind_fs[energy_ind_fs.start_fuel == energy_ind_fs.end_fuel].index)
 energy_ind_fs = energy_ind_fs.drop(energy_ind_fs[energy_ind_fs.end_fuel == "-"].index)
 # Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail',
-                      #'process',
-                      'start_fuel','end_fuel','unit','year']
+cols = common_cols + ['sector','subsector','subsector_detail','start_fuel','end_fuel','unit','year']
 energy_ind_fs = energy_ind_fs.groupby(cols, sort=True)['energy_demand'].sum()
 energy_ind_fs_df = energy_ind_fs.to_frame()
 energy_summary_ind_fs = pd.pivot_table(energy_ind_fs_df, values='energy_demand',index=cols[:-1], columns='year', aggfunc='sum')
