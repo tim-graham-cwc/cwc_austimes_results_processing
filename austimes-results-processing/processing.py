@@ -3,6 +3,8 @@ import pytz
 import pandas as pd
 import warnings
 from directories import Directories
+import numpy as np
+from openpyxl import load_workbook
 
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
@@ -69,6 +71,8 @@ elec_cap_gen = pd.read_csv(INPUT_PATH + INPUT_ELCG_FILENAME)
 eneff_ind = pd.read_csv(INPUT_PATH + INPUT_EnEff_IND_FILENAME)
 eneff_bld = pd.read_csv(INPUT_PATH + INPUT_EnEff_BLD_FILENAME)
 H2_gen_cap = pd.read_csv(INPUT_PATH + INPUT_H2GC_FILENAME)
+core_emis_detail = pd.read_csv(INPUT_PATH + INPUT_EMIS_FILENAME)
+
 
 ### Common functions [To Do - move into class in separate file]
 ## Function to perform gap filling by linear interpolation
@@ -486,7 +490,6 @@ input_filename = INPUT_EMIS_FILENAME.split(".")[0]
 
 ## Reading input files
 # Read veda report file
-core_emis_detail = pd.read_csv(INPUT_PATH + INPUT_EMIS_FILENAME)
 core_emis_detail["sector"] = ""
 core_emis_detail["subsector"] = ""
 core_emis_detail["subsector_detail"] = ""
@@ -835,18 +838,18 @@ print(f"Files will be exported to '{nested_directory_path}'.")
 
 output_path = OUTPUT_PATH + nested_directory_path.name + "/"
 
-## Export to combined Excel file
-with pd.ExcelWriter(output_path +  "Combined_results" + ".xlsx") as writer:
-
-    # use to_excel function and specify the sheet_name and index
-    # to store the dataframe in specified sheet
-
-    combined_energy.to_excel(writer, sheet_name="Energy", index=False)
-    combined_fuelswitch.to_excel(writer, sheet_name="Fuel switching", index=False)
-    emis_summary.to_excel(writer, sheet_name="Emissions", index=False)
-    elec_summary_cap_gen.to_excel(writer, sheet_name="Elec gen cap", index=False)
-    eneff_summary.to_excel(writer, sheet_name="Energy efficiency", index=False)
-    H2_gen_cap_summary.to_excel(writer, sheet_name="H2 gen cap", index=False)
+# ## Export to combined Excel file
+# with pd.ExcelWriter(output_path +  "Combined_results" + ".xlsx") as writer:
+#
+#     # use to_excel function and specify the sheet_name and index
+#     # to store the dataframe in specified sheet
+#
+#     combined_energy.to_excel(writer, sheet_name="Energy", index=False)
+#     combined_fuelswitch.to_excel(writer, sheet_name="Fuel switching", index=False)
+#     emis_summary.to_excel(writer, sheet_name="Emissions", index=False)
+#     elec_summary_cap_gen.to_excel(writer, sheet_name="Elec gen cap", index=False)
+#     eneff_summary.to_excel(writer, sheet_name="Energy efficiency", index=False)
+#     H2_gen_cap_summary.to_excel(writer, sheet_name="H2 gen cap", index=False)
 
 #Export csvs
 combined_energy.to_csv(output_path +  "energy" + ".csv", index=False)
@@ -855,5 +858,44 @@ emis_summary.to_csv(output_path +  "emissions" + ".csv", index=False)
 elec_summary_cap_gen.to_csv(output_path +  "electricity-gen-cap" + ".csv", index=False)
 eneff_summary.to_csv(output_path +  "energy-efficiency" + ".csv", index=False)
 H2_gen_cap_summary.to_csv(output_path +  "hydrogen-generation-capacity" + ".csv", index=False)
+print("csv files exported")
+
+
+### Add to visualisation template
+#Copy template
+print("Copying excel visualisation template")
+import shutil
+template_path = r"templates/excel-viz-template.xlsx"
+results_path = output_path +  "results-summary-with-visualisation" + ".xlsx"
+shutil.copy2(template_path, results_path)
+print("Excel visualisation template copied")
+
+#Get scenario names
+scenarios = sorted(core_emis_detail['scenario'].unique())
+print("scenario names: ", scenarios)
+# Write scenario names to workbook
+book = load_workbook(results_path)
+scenario_names = book["Scenario names"]
+row = 3
+for scenario in scenarios:
+  scenario_names.cell(row = row, column = 3).value = scenario
+  row += 1
+
+book.save(results_path)
+print("Scenario names added to excel sheet")
+
+# Add sheets to workbook
+book = load_workbook(results_path)
+writer=pd.ExcelWriter(results_path, engine = 'openpyxl',mode='a',if_sheet_exists="overlay")
+
+elec_summary_cap_gen.to_excel(writer, sheet_name = 'Elec', index=False)
+H2_gen_cap_summary.to_excel(writer, sheet_name = 'H2', index=False)
+eneff_summary.to_excel(writer, sheet_name = 'Energy eff', index=False)
+combined_energy.to_excel(writer, sheet_name = 'Energy use', index=False)
+emis_summary.to_excel(writer, sheet_name = 'Emis', index=False)
+writer.close()
 
 print("All files exported")
+
+
+
