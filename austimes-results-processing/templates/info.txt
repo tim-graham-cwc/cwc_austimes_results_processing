@@ -1,0 +1,3 @@
+This directory is used to contain excel templates for results visualisation.
+These files should not be uploaded to github, to protect Climateworks IP.
+To access contact Tim Graham, Senior Analyst, tim.graham@climateworkscentre.org
