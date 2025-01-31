@@ -9,4 +9,5 @@
 /austimes-results-processing/inputs/CORE_H2 capacity and generation.csv
 /austimes-results-processing/inputs/Elec fuels.csv
 /austimes-results-processing/outputs/*
-
+/austimes-results-processing/templates/excel-viz-template.xlsx
+/austimes-results-processing/templates/excel-viz-template-copy keep in case main file becomes corrupted.xlsx

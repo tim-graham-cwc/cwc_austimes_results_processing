@@ -1,18 +1,20 @@
+### Library imports
 from datetime import datetime
 import pytz
 import pandas as pd
 import warnings
 from directories import Directories
-import numpy as np
 from openpyxl import load_workbook
+from pathlib import Path
 
+### Ignore lexsort warnings
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 
 ### Run options
 STATES = "y" #To split results by state, set to "y", otherwise "n"
-SECTORAL_PLANS = "n" #To include sectoral plans sector mapping, set to "y", otherwise "n"
-WIDE_OR_LONG = "w" #For wide format set to "w", for long set to "l"
+SECTORAL_PLANS = "y" #To include sectoral plans sector mapping, set to "y", otherwise "n"
+WIDE_OR_LONG = "l" #For wide format set to "w", for long set to "l". Note for Excel visualisation template export, must use wide format
 
 
 ### Define data file names
@@ -792,7 +794,12 @@ print("Hydrogen gen/cap results processed")
 
 
 ### Applying user defined options
+dfs = [energy_summary_trans, energy_summary_com, energy_summary_res, energy_summary_ind, energy_summary_elc,
+       energy_summary_com_fs, energy_summary_res_fs, energy_summary_ind_fs, emis_summary, elec_summary_cap_gen,
+       eneff_summary, H2_gen_cap_summary]
 if SECTORAL_PLANS == "y":
+  # for df in dfs:
+  #   df = add_sectoral_plan_mapping(df)
   energy_summary_trans = add_sectoral_plan_mapping(energy_summary_trans)
   energy_summary_com = add_sectoral_plan_mapping(energy_summary_com)
   energy_summary_res = add_sectoral_plan_mapping(energy_summary_res)
@@ -827,8 +834,6 @@ print("Results processing complete")
 
 
 ### Exporting files
-from pathlib import Path
-
 # Specify the nested directory structure
 nested_directory_path = Path("outputs/" + dt)
 
@@ -837,19 +842,6 @@ nested_directory_path.mkdir(parents=True, exist_ok=True)
 print(f"Files will be exported to '{nested_directory_path}'.")
 
 output_path = OUTPUT_PATH + nested_directory_path.name + "/"
-
-# ## Export to combined Excel file
-# with pd.ExcelWriter(output_path +  "Combined_results" + ".xlsx") as writer:
-#
-#     # use to_excel function and specify the sheet_name and index
-#     # to store the dataframe in specified sheet
-#
-#     combined_energy.to_excel(writer, sheet_name="Energy", index=False)
-#     combined_fuelswitch.to_excel(writer, sheet_name="Fuel switching", index=False)
-#     emis_summary.to_excel(writer, sheet_name="Emissions", index=False)
-#     elec_summary_cap_gen.to_excel(writer, sheet_name="Elec gen cap", index=False)
-#     eneff_summary.to_excel(writer, sheet_name="Energy efficiency", index=False)
-#     H2_gen_cap_summary.to_excel(writer, sheet_name="H2 gen cap", index=False)
 
 #Export csvs
 combined_energy.to_csv(output_path +  "energy" + ".csv", index=False)
@@ -861,39 +853,43 @@ H2_gen_cap_summary.to_csv(output_path +  "hydrogen-generation-capacity" + ".csv"
 print("csv files exported")
 
 
+
 ### Add to visualisation template
-#Copy template
-print("Copying excel visualisation template")
-import shutil
-template_path = r"templates/excel-viz-template.xlsx"
-results_path = output_path +  "results-summary-with-visualisation" + ".xlsx"
-shutil.copy2(template_path, results_path)
-print("Excel visualisation template copied")
+if WIDE_OR_LONG == "w":
+  #Copy template
+  print("Copying excel visualisation template")
+  import shutil
+  template_path = r"templates/excel-viz-template.xlsx"
+  results_path = output_path +  "results-summary-with-visualisation" + ".xlsx"
+  shutil.copy2(template_path, results_path)
+  print("Excel visualisation template copied")
 
-#Get scenario names
-scenarios = sorted(core_emis_detail['scenario'].unique())
-print("scenario names: ", scenarios)
-# Write scenario names to workbook
-book = load_workbook(results_path)
-scenario_names = book["Scenario names"]
-row = 3
-for scenario in scenarios:
-  scenario_names.cell(row = row, column = 3).value = scenario
-  row += 1
+  #Get scenario names
+  scenarios = sorted(core_emis_detail['scenario'].unique())
+  print("scenario names: ", scenarios)
+  # Write scenario names to workbook
+  book = load_workbook(results_path)
+  scenario_names = book["Scenario names"]
+  row = 3
+  for scenario in scenarios:
+    scenario_names.cell(row = row, column = 3).value = scenario
+    row += 1
 
-book.save(results_path)
-print("Scenario names added to excel sheet")
+  book.save(results_path)
+  print("Scenario names added to excel sheet")
 
-# Add sheets to workbook
-book = load_workbook(results_path)
-writer=pd.ExcelWriter(results_path, engine = 'openpyxl',mode='a',if_sheet_exists="overlay")
+  # Add sheets to workbook
+  book = load_workbook(results_path)
+  writer=pd.ExcelWriter(results_path, engine = 'openpyxl',mode='a',if_sheet_exists="overlay")
 
-elec_summary_cap_gen.to_excel(writer, sheet_name = 'Elec', index=False)
-H2_gen_cap_summary.to_excel(writer, sheet_name = 'H2', index=False)
-eneff_summary.to_excel(writer, sheet_name = 'Energy eff', index=False)
-combined_energy.to_excel(writer, sheet_name = 'Energy use', index=False)
-emis_summary.to_excel(writer, sheet_name = 'Emis', index=False)
-writer.close()
+  elec_summary_cap_gen.to_excel(writer, sheet_name = 'Elec', index=False)
+  H2_gen_cap_summary.to_excel(writer, sheet_name = 'H2', index=False)
+  eneff_summary.to_excel(writer, sheet_name = 'Energy eff', index=False)
+  combined_energy.to_excel(writer, sheet_name = 'Energy use', index=False)
+  emis_summary.to_excel(writer, sheet_name = 'Emis', index=False)
+  writer.close()
+else:
+  pass
 
 print("All files exported")
 
