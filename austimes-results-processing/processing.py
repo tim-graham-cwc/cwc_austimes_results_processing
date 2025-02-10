@@ -13,8 +13,8 @@ warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 ### Run options
 STATES = "y" #To split results by state, set to "y", otherwise "n"
-SECTORAL_PLANS = "y" #To include sectoral plans sector mapping, set to "y", otherwise "n"
-WIDE_OR_LONG = "l" #For wide format set to "w", for long set to "l". Note for Excel visualisation template export, must use wide format
+SECTORAL_PLANS = "n" #To include sectoral plans sector mapping, set to "y", otherwise "n"
+WIDE_OR_LONG = "w" #For wide format set to "w", for long set to "l". Note for Excel visualisation template export, must use wide format
 
 
 ### Define data file names
@@ -859,7 +859,8 @@ if WIDE_OR_LONG == "w":
   #Copy template
   print("Copying excel visualisation template")
   import shutil
-  template_path = r"templates/excel-viz-template.xlsx"
+  # Template lives on S: Drive as this cannot be stored publicly on GitHub. Must be connected to VPN to run this part of the code
+  template_path = r"S:\VC-DVCResearch\CWA\Projects\Current\AusTIMES - Streamlining Results Processing\templates\excel-viz-template.xlsx"
   results_path = output_path +  "results-summary-with-visualisation" + ".xlsx"
   shutil.copy2(template_path, results_path)
   print("Excel visualisation template copied")
