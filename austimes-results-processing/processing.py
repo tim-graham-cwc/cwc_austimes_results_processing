@@ -855,11 +855,11 @@ print("csv files exported")
 
 
 ### Add to visualisation template
-if WIDE_OR_LONG == "w":
+if WIDE_OR_LONG == "w" and STATES == "y" and SECTORAL_PLANS == "n":
   #Copy template
   print("Copying excel visualisation template")
   import shutil
-  template_path = r"templates/excel-viz-template.xlsx"
+  template_path = r"S:\VC-DVCResearch\CWA\Projects\Current\AusTIMES - Streamlining Results Processing\templates\excel-viz-template.xlsx"
   results_path = output_path +  "results-summary-with-visualisation" + ".xlsx"
   shutil.copy2(template_path, results_path)
   print("Excel visualisation template copied")
