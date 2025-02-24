@@ -7,9 +7,9 @@
 - Clone this repository on your machine
 - Once setup, you can install all required packages by running the following command in the project directory:
 > pip install -r requirements.txt
-- To run processing you must ensure input files are added to the /inputs directory. Required files are detailed in /inputs/info.txt file
 
 ## Running the scripts
+- To run processing you must ensure input files are added to the /inputs directory. Required files are detailed in /inputs/info.txt file
 - The output directory can be changed within the directories.py file
 - Run options are found near the top of the processing.py file
 - If you wish to output excel visualisation files, you must be connected to the Monash VPN, as the templates are stored on 
