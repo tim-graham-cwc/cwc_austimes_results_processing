@@ -14,7 +14,7 @@ warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 ### Run options
 STATES = "y" #To split results by state, set to "y", otherwise "n". Note for Excel visualisation template export, must select "y"
 SECTORAL_PLANS = "n" #To include sectoral plans sector mapping, set to "y", otherwise "n". Note for Excel visualisation template export, must select "n"
-WIDE_OR_LONG = "w" #For wide format set to "w", for long set to "l". Note for Excel visualisation template export, must use wide format
+WIDE_OR_LONG = "l" #For wide format set to "w", for long set to "l". Note for Excel visualisation template export, must use wide format
 
 
 ### Define data file names
@@ -832,8 +832,7 @@ else:
   pass
 print("Results processing complete")
 
-
-### Exporting files
+### Exporting data files
 # Specify the nested directory structure
 nested_directory_path = Path("outputs/" + dt)
 
@@ -892,6 +891,5 @@ else:
   pass
 
 print("All files exported")
-
 
 

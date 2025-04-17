@@ -2,7 +2,6 @@
 ## Info
 - This project is used by Climateworks Centre to process results from the AusTIMES model
 
-
 ## Setup
 - Clone this repository on your machine
 - Once setup, you can install all required packages by running the following command in the project directory:
@@ -19,3 +18,6 @@ the S: Drive. They are stored here and not on Github  as they should not be made
 - Ensure that changes are made on branches and not to the master branch
 - All updates should be reviewed before being merged to the master branch
 - When commiting to git, DO NOT upload results files to the repository, as this will make them publicly available
+
+## Connection to SQL Server
+- You may need to update the server credentials stored in the sql-server-details,py file in order to connect to the SQL database on the machine from which you are running these scripts
