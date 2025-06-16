@@ -21,16 +21,16 @@ DATABASE = server_details.database
 STATES = "y" #To split results by state, set to "y", otherwise "n". Note for Excel visualisation template export, must select "y"
 
 ### Define data file names
-INPUT_TRA_FILENAME = "CORE_Fin energy Transport.csv"
-INPUT_COM_FILENAME = "CORE_Fin energy Commercial.csv"
-INPUT_RES_FILENAME = "CORE_Fin energy Residential.csv"
-INPUT_IND_FILENAME = "CORE_Fin energy Industry.csv"
-INPUT_ELC_FILENAME = "Elec fuels.csv"
-INPUT_EMIS_FILENAME = "CORE_emis_detail.csv"
-INPUT_ELCG_FILENAME = "CORE_Elec capacity and generation.csv"
-INPUT_EnEff_IND_FILENAME = "CORE-EnEff Industry.csv"
-INPUT_EnEff_BLD_FILENAME = "CORE-EnEff Buildings.csv"
-INPUT_H2GC_FILENAME = "CORE_H2 capacity and generation.csv"
+INPUT_TRA_FILENAME = "FE_transport.csv"
+INPUT_COM_FILENAME = "FE_commercial.csv"
+INPUT_RES_FILENAME = "FE_residential.csv"
+INPUT_IND_FILENAME = "FE_industry.csv"
+INPUT_ELC_FILENAME = "FE_power.csv"
+INPUT_EMIS_FILENAME = "CO2 emissions.csv"
+INPUT_ELCG_FILENAME = "Elec capacity and generation.csv"
+#INPUT_EnEff_IND_FILENAME = "CORE-EnEff Industry.csv"
+#INPUT_EnEff_BLD_FILENAME = "CORE-EnEff Buildings.csv"
+INPUT_H2GC_FILENAME = "H2 capacity and generation.csv"
 
 
 ###Set directories
@@ -801,37 +801,37 @@ cursor = connection.cursor()
 
 #Fuelswitch
 for index, row in combined_fuelswitch.iterrows():
-    cursor.execute("INSERT INTO TestData.dbo.FuelSwitch (study,scenario,_state,sector,subsector,subsector_detail,start_fuel,end_fuel,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?,?,?)",
+    cursor.execute("INSERT INTO DevAusTIMES.dbo.FuelSwitch (study,scenario,_state,sector,subsector,subsector_detail,start_fuel,end_fuel,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?,?,?)",
                    row.study,row.scenario, row.state, row.sector,row.subsector,row.subsector_detail,row.start_fuel,row.end_fuel,row.unit,row.year,row.value,dt)
 print("FuelSwitch table data written to SQL database")
 
 #Energy
 for index, row in combined_energy.iterrows():
-    cursor.execute("INSERT INTO TestData.dbo.Energy (study,scenario,_state,sector,subsector,subsector_detail,fuel_type,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?,?)",
+    cursor.execute("INSERT INTO DevAusTIMES.dbo.Energy (study,scenario,_state,sector,subsector,subsector_detail,fuel_type,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?,?)",
                    row.study,row.scenario, row.state, row.sector,row.subsector,row.subsector_detail,row.fuel_type,row.unit,row.year,row.value,dt)
 print("Energy table data written to SQL database")
 
 #Emissions
 for index, row in emis_summary.iterrows():
-    cursor.execute("INSERT INTO TestData.dbo.Emissions (study,scenario,_state,sector,subsector,subsector_detail,emis_type,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?,?)",
+    cursor.execute("INSERT INTO DevAusTIMES.dbo.Emissions (study,scenario,_state,sector,subsector,subsector_detail,emis_type,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?,?)",
                    row.study,row.scenario, row.state, row.sector,row.subsector,row.subsector_detail,row.emis_type,row.unit,row.year,row.value,dt)
 print("Emissions data written to SQL database")
 
 #ElecGenCap
 for index, row in elec_summary_cap_gen.iterrows():
-    cursor.execute("INSERT INTO TestData.dbo.ElectricityGenCap (study,scenario,_state,sector,technology,technology_detail,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?)",
+    cursor.execute("INSERT INTO DevAusTIMES.dbo.ElectricityGenCap (study,scenario,_state,sector,technology,technology_detail,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?)",
                    row.study,row.scenario, row.state, row.sector,row.technology,row.technology_detail,row.unit,row.year,row.value,dt)
 print("Electricty Generation and Capacity data written to SQL database")
 
 #EnergyEfficiency
 for index, row in eneff_summary.iterrows():
-    cursor.execute("INSERT INTO TestData.dbo.EnergyEfficiency (study,scenario,_state,sector,subsector,subsector_detail,fuel_type,efficiency_type,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?,?,?)",
+    cursor.execute("INSERT INTO DevAusTIMES.dbo.EnergyEfficiency (study,scenario,_state,sector,subsector,subsector_detail,fuel_type,efficiency_type,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?,?,?)",
                    row.study,row.scenario, row.state, row.sector,row.subsector,row.subsector_detail,row.fuel_type,row.efficiency_type,row.unit,row.year,row.value,dt)
 print("Energy efficiency data written to SQL database")
 
 #H2GenCap
 for index, row in H2_gen_cap_summary.iterrows():
-    cursor.execute("INSERT INTO TestData.dbo.HydrogenGenCap (study,scenario,_state,sector,subsector,subsector_detail,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?)",
+    cursor.execute("INSERT INTO DevAusTIMES.dbo.HydrogenGenCap (study,scenario,_state,sector,subsector,subsector_detail,unit,_year,_value,processed_at) values(?,?,?,?,?,?,?,?,?,?)",
                    row.study,row.scenario, row.state, row.sector,row.subsector,row.subsector_detail,row.unit,row.year,row.value,dt)
 print("Hydrogen Generation and Capacity data written to SQL database")
 

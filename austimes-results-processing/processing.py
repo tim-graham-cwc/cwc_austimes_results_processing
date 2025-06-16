@@ -14,20 +14,20 @@ warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 ### Run options
 STATES = "y" #To split results by state, set to "y", otherwise "n". Note for Excel visualisation template export, must select "y"
 SECTORAL_PLANS = "n" #To include sectoral plans sector mapping, set to "y", otherwise "n". Note for Excel visualisation template export, must select "n"
-WIDE_OR_LONG = "l" #For wide format set to "w", for long set to "l". Note for Excel visualisation template export, must use wide format
+WIDE_OR_LONG = "w" #For wide format set to "w", for long set to "l". Note for Excel visualisation template export, must use wide format
 
 
 ### Define data file names
-INPUT_TRA_FILENAME = "CORE_Fin energy Transport.csv"
-INPUT_COM_FILENAME = "CORE_Fin energy Commercial.csv"
-INPUT_RES_FILENAME = "CORE_Fin energy Residential.csv"
-INPUT_IND_FILENAME = "CORE_Fin energy Industry.csv"
-INPUT_ELC_FILENAME = "Elec fuels.csv"
-INPUT_EMIS_FILENAME = "CORE_emis_detail.csv"
-INPUT_ELCG_FILENAME = "CORE_Elec capacity and generation.csv"
-INPUT_EnEff_IND_FILENAME = "CORE-EnEff Industry.csv"
-INPUT_EnEff_BLD_FILENAME = "CORE-EnEff Buildings.csv"
-INPUT_H2GC_FILENAME = "CORE_H2 capacity and generation.csv"
+INPUT_TRA_FILENAME = "FE_transport.csv"
+INPUT_COM_FILENAME = "FE_commercial.csv"
+INPUT_RES_FILENAME = "FE_residential.csv"
+INPUT_IND_FILENAME = "FE_industry.csv"
+INPUT_ELC_FILENAME = "FE_power.csv"
+INPUT_EMIS_FILENAME = "CO2 emissions.csv"
+INPUT_ELCG_FILENAME = "Elec capacity and generation.csv"
+INPUT_EnEff_IND_FILENAME = "EnEff Industry.csv"
+INPUT_EnEff_BLD_FILENAME = "EnEff Buildings.csv"
+INPUT_H2GC_FILENAME = "H2 capacity and generation.csv"
 
 
 ###Set directories
@@ -858,7 +858,7 @@ if WIDE_OR_LONG == "w" and STATES == "y" and SECTORAL_PLANS == "n":
   #Copy template
   print("Copying excel visualisation template")
   import shutil
-  template_path = r"S:\VC-DVCResearch\CWA\Projects\Current\AusTIMES - Streamlining Results Processing\templates\excel-viz-template.xlsx"
+  template_path = r"T:\GitHub\cwc_austimes_results_processing\austimes-results-processing\templates\excel-viz-template.xlsx"
   results_path = output_path +  "results-summary-with-visualisation" + ".xlsx"
   shutil.copy2(template_path, results_path)
   print("Excel visualisation template copied")

@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+This directory is used to contain CSV input data from Veda.
+These files should not be uploaded to github, to protect Climateworks IP.
+To access contact Tim Graham, Senior Analyst, tim.graham@climateworkscentre.org
+=======
 In this directory add the files that have been exported from Veda. Required files are as follows:
 CORE_Fin energy Transport.csv
 CORE_Fin energy Commercial.csv
@@ -9,3 +14,4 @@ CORE_Elec capacity and generation.csv
 CORE-EnEff Industry.csv
 CORE-EnEff Buildings.csv
 CORE_H2 capacity and generation.csv
+>>>>>>> a65abc7bea28905109d60aec0896121077cc86db

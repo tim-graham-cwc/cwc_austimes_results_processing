@@ -2,18 +2,21 @@ subsector_p,subsector
 Appt,Apartment
 Shou,House
 Thou,Townhouse
-Age_Care,Age Care
-Dat_Cen,Data Centre
-Hosp,Hospital
-Hotel,Hotel
-Law_Cour,Law Court
-Office,Office
-Pub_Bldg,Public Building
-Retail,Retail
-School,School
-SupMkt,Supermarket
-Tertiary,Tertiary
 -,-
 Appartment,Apartment
 SingleHouse,House
 TownHouse,Townhouse
+Age_Care,Aged care facilities (including nursing homes)
+Comm_Bldg,Commercial buildings nec
+Dat_Ctr,Data centres
+Educ_School,Education buildings - Schools
+Educ_Tertiary,Education buildings - Tertiary
+Rec_Bldg,Entertainment and recreation buildings
+Hosp,Health facilities
+Pub_Bldg,Non-residential buildings nec
+Office,Offices
+Rlgn_Bldg,Religion buildings
+Retail,Retail and wholesale trade buildings
+Hotel,Short term accommodation buildings
+Tra_Bldg,Transport buildings
+Warehouse,Warehouses
