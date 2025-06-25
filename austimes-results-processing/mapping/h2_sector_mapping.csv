@@ -1,0 +1,14 @@
+subsector_detail,subsector
+Synthetic fuel production,Intermediate use
+Hydrogen export,Hydrogen export
+Alkaline electrolysis,Green hydrogen
+Proton exchange membrane electrolysis,Green hydrogen
+Steam methane reforming,Grey hydrogen
+Steam methane reforming w/CCS,Blue hydrogen
+Hydrogen storage,Intermediate use
+-,-
+Co-processing,Intermediate use
+Diaphram cell processing,Intermediate use
+Membrane cell processing,Intermediate use
+Steam cracking - ethane,Intermediate use
+Steam cracking - propane,Intermediate use

@@ -1,0 +1,14 @@
+﻿process,subsector_detail
+-,Synthetic fuel production
+H2Export,Hydrogen export
+H2prd_elec_AE,Alkaline electrolysis
+H2prd_elec_PEM,Proton exchange membrane electrolysis
+H2prd_SMR,Steam methane reforming
+H2prd_SMR_ccs,Steam methane reforming w/CCS
+H2storage,Hydrogen storage
+IMPMATZ,-
+Ipc_CO process,Co-processing
+Ipc_Diaphragm Cell Process,Diaphram cell processing
+Ipc_Membrane Cell Process,Membrane cell processing
+Ipc_Steam Cracking-Ethane,Steam cracking - ethane
+Ipc_Steam Cracking-Propane,Steam cracking - propane

@@ -1,8 +1,8 @@
 ﻿tech,technology
 -,-
 Coal,Coal
-Gas-base,Gas-base
-Gas-peak,Gas-peak
+Gas-base,Baseload gas
+Gas-peak,Peaking gas
 Hydro,Hydro
 Lignite,Lignite
 Oil,Oil

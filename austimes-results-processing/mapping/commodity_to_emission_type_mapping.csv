@@ -9,5 +9,9 @@ LUCO2seq,Sequestration,
 H2CO2Cap,Capture,
 H2CO2N,Energy,
 CO2Captured_dac,Capture,
-INDCO2P,Sequestration,Used only for Forestry and logging
-INDCO2N,Energy,Used only for Forestry and logging
+INDCO2P,Process,
+INDCO2N,Energy,
+pc_co2,Process,
+ELCCO2adj,Energy,
+im_co2,Process,
+inm_co2,Process,
