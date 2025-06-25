@@ -1,895 +1,434 @@
-### Library imports
-from datetime import datetime
-import pytz
-import pandas as pd
 import warnings
-from directories import Directories
-from openpyxl import load_workbook
+from datetime import datetime
 from pathlib import Path
 
-### Ignore lexsort warnings
-warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
+import pandas as pd
+import pytz
+from directories import Directories
+from openpyxl import load_workbook
+import shutil
 
+# ---------------------------------------------
+# Configuration
+# ---------------------------------------------
+STATES = True           # Split results by state?
+WIDE_FORMAT = True      # True for wide ("w"), False for long ("l")
 
-### Run options
-STATES = "y" #To split results by state, set to "y", otherwise "n". Note for Excel visualisation template export, must select "y"
-SECTORAL_PLANS = "n" #To include sectoral plans sector mapping, set to "y", otherwise "n". Note for Excel visualisation template export, must select "n"
-WIDE_OR_LONG = "w" #For wide format set to "w", for long set to "l". Note for Excel visualisation template export, must use wide format
+# Input filenames
+INPUT_FILES = {
+    'transport': 'FE_transport.csv',
+    'commercial': 'FE_commercial.csv',
+    'residential': 'FE_residential.csv',
+    'industry': 'FE_industry.csv',
+    'power': 'FE_power.csv',
+    'emissions': 'CO2 emissions.csv',
+    'elec_cap_gen': 'Elec capacity and generation.csv',
+    'h2': 'H2 capacity and generation.csv'
+}
 
+# Directories
+dirs = Directories()
+INPUT_PATH = Path(dirs.INPUT_PATH)
+OUTPUT_PATH = Path(dirs.OUTPUT_PATH)
+MAPPING_PATH = Path(dirs.MAPPING_PATH)
 
-### Define data file names
-INPUT_TRA_FILENAME = "FE_transport.csv"
-INPUT_COM_FILENAME = "FE_commercial.csv"
-INPUT_RES_FILENAME = "FE_residential.csv"
-INPUT_IND_FILENAME = "FE_industry.csv"
-INPUT_ELC_FILENAME = "FE_power.csv"
-INPUT_EMIS_FILENAME = "CO2 emissions.csv"
-INPUT_ELCG_FILENAME = "Elec capacity and generation.csv"
-INPUT_EnEff_IND_FILENAME = "EnEff Industry.csv"
-INPUT_EnEff_BLD_FILENAME = "EnEff Buildings.csv"
-INPUT_H2GC_FILENAME = "H2 capacity and generation.csv"
+# Timestamp
+melb_tz = pytz.timezone('Australia/Melbourne')
+TIMESTAMP = datetime.now(melb_tz).strftime('%Y-%m-%d_%H-%M')
 
+# Suppress pandas performance warnings
+warnings.simplefilter('ignore', category=pd.errors.PerformanceWarning)
 
-###Set directories
-directories = Directories()
-INPUT_PATH = directories.INPUT_PATH
-OUTPUT_PATH = directories.OUTPUT_PATH
-MAPPING_PATH = directories.MAPPING_PATH
+# ---------------------------------------------
+# Helper Functions
+# ---------------------------------------------
 
+def read_mapping(filename, key_col, val_col):
+    df = pd.read_csv(MAPPING_PATH / filename)
+    return dict(zip(df[key_col], df[val_col]))
 
+# Linear gap-fill of columns (assumes numeric year columns)
+def gap_fill(df):
+    """Expands df with missing years and interpolates linearly."""
+    df = df.copy()
 
-### Get current date and time in Melbourne for labelling csv outputs
-now = datetime.now()
-tz_Melbourne = pytz.timezone('Australia/Melbourne')
-datetime_Melbourne = datetime.now(tz_Melbourne)
-dt = datetime_Melbourne.strftime("%Y-%m-%d_%H-%M")
+    # Only include columns that are integers (i.e., years)
+    year_cols = [col for col in df.columns if isinstance(col, int)]
 
-### Read files
-##Mapping files [To Do - create combined mapping file]
-sd_to_s = pd.read_csv(MAPPING_PATH + "subsector_detail_to_subsector_mapping_v2.csv")
-sd_to_s_dict = sd_to_s.to_dict('list')
-com_to_et = pd.read_csv(MAPPING_PATH + "commodity_to_emission_type_mapping.csv")
-com_to_et_dict = com_to_et.to_dict('list')
-eu_to_sd = pd.read_csv(MAPPING_PATH + "enduse_to_subsector_detail_mapping.csv")
-eu_to_sd_dict = eu_to_sd.to_dict('list')
-sp_to_s = pd.read_csv(MAPPING_PATH + "subsector_p_to_subsector_mapping.csv")
-sp_to_s_dict = sp_to_s.to_dict('list')
-t_to_s = pd.read_csv(MAPPING_PATH + "tech_to_technology_mapping.csv")
-t_to_s_dict = t_to_s.to_dict('list')
-tech_to_technology = pd.read_csv(MAPPING_PATH + "tech_to_technology_mapping.csv")
-tech_to_technology_dict = tech_to_technology.to_dict('list')
-pc_to_td =pd.read_csv(MAPPING_PATH + "process_code_to_tech_detail_mapping.csv")
-pc_to_td_dict = pc_to_td.to_dict('list')
+    if not year_cols:
+        # Check if any column names look like years (string but numeric)
+        str_years = [col for col in df.columns if str(col).isdigit()]
+        df.columns = [int(col) if str(col).isdigit() else col for col in df.columns]
+        year_cols = [col for col in df.columns if isinstance(col, int)]
 
+    if not year_cols:
+        return df  # Still nothing, exit safely
 
+    year_cols = sorted(year_cols)
+    full_years = list(range(year_cols[0], year_cols[-1] + 1))
 
-##Data files
-energy_tra = pd.read_csv(INPUT_PATH + INPUT_TRA_FILENAME)
-energy_res = pd.read_csv(INPUT_PATH + INPUT_RES_FILENAME)
-energy_com = pd.read_csv(INPUT_PATH + INPUT_COM_FILENAME)
-energy_ind = pd.read_csv(INPUT_PATH + INPUT_IND_FILENAME)
-energy_elc = pd.read_csv(INPUT_PATH + INPUT_ELC_FILENAME)
-elec_cap_gen = pd.read_csv(INPUT_PATH + INPUT_ELCG_FILENAME)
-eneff_ind = pd.read_csv(INPUT_PATH + INPUT_EnEff_IND_FILENAME)
-eneff_bld = pd.read_csv(INPUT_PATH + INPUT_EnEff_BLD_FILENAME)
-H2_gen_cap = pd.read_csv(INPUT_PATH + INPUT_H2GC_FILENAME)
-core_emis_detail = pd.read_csv(INPUT_PATH + INPUT_EMIS_FILENAME)
+    for year in full_years:
+        if year not in df.columns:
+            df[year] = pd.NA
 
+    df = df.sort_index(axis=1)
+    df[full_years] = df[full_years].apply(pd.to_numeric, errors='coerce')
+    df[full_years] = df[full_years].interpolate(axis=1, limit_direction='both')
+    return df
 
-### Common functions [To Do - move into class in separate file]
-## Function to perform gap filling by linear interpolation
-def gap_fill_dataframe(dataframe):
-  # Building a dictionary with years which have data
-  data_years = dataframe.columns.values.tolist()
-  #print(data_years)
-  all_years = [x for x in range(data_years[0],data_years[-1]+1)]
-  #print(all_years)
-  interp_dict = {
-    "year": [],
-    "years_since":  [],
-    "years_to": []
-  }
-  n = 0
-  for year in all_years:
-    interp_dict['year'].append(year)
-    if year in data_years:
-      n = 0
-      interp_dict['years_since'].append(n)
-    else:
-      n += 1
-      interp_dict['years_since'].append(n)
-  m = 0
-  for year in reversed(all_years):
-    if year in data_years:
-      m = 0
-      interp_dict['years_to'].insert(0, m)
-    else:
-      m += 1
-      interp_dict['years_to'].insert(0, m)
-    # Interpolating data in emissions summary sheet
-  for index, row in dataframe.iterrows():
-    n = 0
-    for y in interp_dict['year']:
-      ys = interp_dict['years_since'][n]
-      yt = interp_dict['years_to'][n]
-      current_year = y
-      next_year = y + yt
-      previous_year = y - ys
-      if ys != 0:
-        step = (dataframe.at[index, next_year] - dataframe.at[index, previous_year]) / (ys + yt)
-        dataframe.at[index, current_year] = dataframe.at[index, previous_year] + (step*ys)
-        #dataframe.at[index, current_year] = interp_value
-      else:
-        pass
-      n += 1
-  dataframe = dataframe[all_years]
-  return dataframe
+# Convert wide DataFrame (with year columns) to long format
+def wide_to_long(df, id_vars):
+    return df.reset_index().melt(id_vars=id_vars, var_name='year', value_name='value').dropna()
 
-## Function to apply sectoral plan sectors
-def add_sectoral_plan_mapping(df):
-  columns = df.columns.values.tolist()
-  if 'subsector' in columns:
-    for index, row in df.iterrows():
+# Summarize by grouping and pivot
+def summarize(df, group_cols, val_col):
+    pivot = pd.pivot_table(df, values=val_col, index=group_cols, columns='year', aggfunc='sum', fill_value=0)
+    return gap_fill(pivot)
 
-      if row['sector'] == "Power" or row['sector'] == "Hydrogen":
-        df.at[index, 'sectoral_plan_sector'] = "Electricity and Energy"
-      elif row['sector'] == "Residential buildings" or row['sector'] == "Commercial buildings":
-        df.at[index, 'sectoral_plan_sector'] = "Built environment"
-      elif row['sector'] == "Transport":
-        if row['subsector'] == "Other transport":
-          df.at[index, 'sectoral_plan_sector'] = "Electricity and Energy"
+# Create fuel switching summary DataFrame
+def summarize_fuel_switching(df, group_cols, value_col):
+    switching_df = df.copy()
+
+    # Set start and end fuel from raw columns if not already set
+    if 'start_fuel' not in switching_df.columns and 'fuel' in switching_df.columns:
+        switching_df['start_fuel'] = switching_df['fuel']
+    if 'end_fuel' not in switching_df.columns and 'fuel_override' in switching_df.columns:
+        switching_df['end_fuel'] = switching_df['fuel_override']
+
+    # Default to start_fuel where end_fuel is blank or '-'
+    switching_df['end_fuel'] = switching_df.apply(
+        lambda row: row['start_fuel'] if pd.isna(row['end_fuel']) or row['end_fuel'] == '-' else row['end_fuel'],
+        axis=1
+    )
+
+    # Always keep all rows regardless of whether switching occurred
+    switching_group_cols = group_cols + ['start_fuel', 'end_fuel']
+    pivot = pd.pivot_table(
+        switching_df,
+        values=value_col,
+        index=switching_group_cols,
+        columns='year',
+        aggfunc='sum',
+        fill_value=0
+    )
+    return gap_fill(pivot).reset_index()
+
+# ---------------------------------------------
+# Load Mapping Dictionaries
+# ---------------------------------------------
+map_enduse = read_mapping('enduse_to_subsector_detail_mapping.csv', 'enduse', 'subsector_detail')
+map_sd2s = read_mapping('subsector_detail_to_subsector_mapping_v2.csv', 'subsector_detail', 'subsector')
+map_sp2s = read_mapping('subsector_p_to_subsector_mapping.csv', 'subsector_p', 'subsector')
+map_spc2sd = read_mapping('subsector_p_cca_to_subsector_detail_mapping.csv','subsector_p_cca','subsector_detail')
+map_com2et = read_mapping('commodity_to_emission_type_mapping.csv', 'commodity', 'emis_type')
+map_t2tech = read_mapping('tech_to_technology_mapping.csv', 'tech', 'technology')
+map_pc2td = read_mapping('process_code_to_tech_detail_mapping.csv', 'process_code', 'tech_detail')
+map_h2tech = read_mapping('h2_mapping.csv','process','subsector_detail')
+map_h2sector = read_mapping('h2_sector_mapping.csv','subsector_detail','subsector')
+map_emis = read_mapping('emis_mapping.csv','emission_type','emis_type')
+map_emsector = read_mapping('emis_sector_mapping.csv','sector0_process','sector')
+
+# Common grouping columns
+common_cols = ['scenario'] + (['state'] if STATES else [])
+
+# ---------------------------------------------
+# Processing Modules
+# ---------------------------------------------
+
+#Transport
+def process_energy_transport():
+    df = pd.read_csv(INPUT_PATH / INPUT_FILES['transport'])
+    df = df.rename(columns={'sector_p': 'sector', 'fuel': 'start_fuel'})
+    # For Transport, no switching: end_fuel = start_fuel
+    df['end_fuel'] = df['start_fuel']
+    df['subsector_detail'] = df['enduse'].map(map_enduse)
+    df['subsector'] = df['subsector_detail'].map(map_sd2s)
+
+    group_cols = common_cols + ['sector', 'subsector', 'subsector_detail', 'start_fuel', 'end_fuel', 'unit']
+    df_summary = summarize(df, group_cols, 'val')
+    df_summary = gap_fill(df_summary).reset_index()
+
+    return df_summary
+
+#Residential
+def process_energy_residential():
+    df = pd.read_csv(INPUT_PATH / INPUT_FILES['residential'])
+    df = df.rename(columns={'sector_p': 'sector', 'fuel_switched': 'start_fuel', 'fuel': 'end_fuel'})
+
+    # Default to end_fuel if start_fuel is missing
+    df['start_fuel'] = df.apply(
+        lambda row: row['end_fuel'] if pd.isna(row['start_fuel']) or row['start_fuel'] == '-' else row['start_fuel'],
+        axis=1
+    )
+    df['subsector_detail'] = df['enduse'].map(map_enduse)
+    df['subsector'] = df['subsector_p'].map(map_sp2s)
+
+    group_cols = common_cols + ['sector', 'subsector', 'subsector_detail', 'start_fuel', 'end_fuel', 'unit']
+    df_summary = summarize(df, group_cols, 'val')
+    df_summary = gap_fill(df_summary).reset_index()
+
+    return df_summary
+
+#Power
+def process_energy_power():
+    df = pd.read_csv(INPUT_PATH / INPUT_FILES['power'])
+    df = df.rename(columns={'sector_p': 'sector', 'fuel': 'start_fuel', 'fuel_override': 'end_fuel'})
+
+    # Omit records where fuel is Renewable, Solar, Wind, or Electricity
+    fuels_to_exclude = ['Renewable', 'Solar', 'Wind', 'Electricity']
+    df = df[~df['start_fuel'].isin(fuels_to_exclude)]
+
+    # Set default end_fuel = start_fuel if not overridden
+    df['end_fuel'] = df.apply(
+        lambda row: row['start_fuel'] if pd.isna(row['end_fuel']) or row['end_fuel'] == '-' else row['end_fuel'],
+        axis=1
+    )
+
+    df['subsector'] = df['technology0_process']
+    df['subsector_detail'] = df['tech'].map(map_t2tech)
+
+    group_cols = common_cols + ['sector', 'subsector', 'subsector_detail', 'start_fuel', 'end_fuel', 'unit']
+    df_summary = summarize(df, group_cols, 'val')
+    df_summary = gap_fill(df_summary).reset_index()
+
+    return df_summary
+
+#Commercial
+def process_energy_commercial():
+    df = pd.read_csv(INPUT_PATH / INPUT_FILES['commercial'])
+    df = df.rename(columns={'sector_p': 'sector', 'fuel': 'start_fuel', 'fuel_override': 'end_fuel'})
+    # Set default end_fuel if blank
+    df['end_fuel'] = df.apply(
+        lambda row: row['start_fuel'] if pd.isna(row['end_fuel']) or row['end_fuel'] == '-' else row['end_fuel'],
+        axis=1
+    )
+    # Calculate energy intensity (EInt) and energy demand
+    df = df.sort_values(by=['scenario', 'state', 'sector', 'subsector_p', 'enduse', 'start_fuel', 'end_fuel', 'unit', 'year'])
+    value = 0
+    eint_list = []
+    for _, row in df.iterrows():
+        if row['varbl'] == 'IESTCS_EnInt':
+            value = row['val'] / row['val~den'] if row['val~den'] != 0 else 0
+            eint_list.append(None)
+        elif row['varbl'] == 'IESTCS_Out':
+            eint_list.append(value)
         else:
-          df.at[index, 'sectoral_plan_sector'] = "Transport"
-      elif row['sector'] == "Carbon dioxide removal":
-        df.at[index, 'sectoral_plan_sector'] = "Carbon dioxide removal"
-      elif row['sector'] == "Industry":
-        if row['subsector'] == "Gas Mining" or row['subsector'] == "Mining":
-          df.at[index, 'sectoral_plan_sector'] = "Resources"
-        elif row['subsector'] == "Agriculture" or row['subsector'] == "Forestry and logging":
-          df.at[index, 'sectoral_plan_sector'] = "Agriculture and Land"
-        elif row['subsector_detail'] == "Construction services" or row['subsector_detail'] == "Construction" or row['subsector_detail'] == "Refridgeration and AirCon" or row['subsector_detail'] == "Water supply, sewerage and drainage services":
-          df.at[index, 'sectoral_plan_sector'] = "Built environment"
+            eint_list.append(None)
+    df['EInt'] = eint_list
+    df = df[df['varbl'] == 'IESTCS_Out']
+    df['energy_demand'] = df['val'] * df['EInt']
+    # Map subsector and detail
+    df['subsector_detail'] = df['enduse'].map(map_enduse)
+    df['subsector'] = df['buildingtype'].map(map_sp2s)
+    # Group by start_fuel and end_fuel as per updated schema
+    group_cols = common_cols + ['sector', 'subsector', 'subsector_detail', 'start_fuel', 'end_fuel', 'unit']
+    df_summary = summarize(df, group_cols, 'energy_demand')
+    df_summary = gap_fill(df_summary).reset_index()
+    return df_summary
+
+#Industry
+def process_energy_industry():
+    df = pd.read_csv(INPUT_PATH / INPUT_FILES['industry'])
+    df = df.rename(columns={'sector_p': 'sector', 'fuel': 'start_fuel', 'fuel_override': 'end_fuel'})
+    # Set default end_fuel if blank
+    df['end_fuel'] = df.apply(
+        lambda row: row['start_fuel'] if pd.isna(row['end_fuel']) or row['end_fuel'] == '-' else row['end_fuel'],
+        axis=1
+    )
+    # Calculate energy intensity (EInt) and energy demand
+    df = df.sort_values(by=['scenario', 'state', 'sector', 'subsector_p', 'subsector_c', 'start_fuel', 'end_fuel', 'unit', 'year'])
+    value = 0
+    eint_list = []
+    for _, row in df.iterrows():
+        if row['varbl'] == 'IESTCS_EnInt':
+            value = row['val'] / row['val~den'] if row['val~den'] != 0 else 0
+            eint_list.append(None)
+        elif row['varbl'] == 'IESTCS_Out':
+            eint_list.append(value)
         else:
-          df.at[index, 'sectoral_plan_sector'] = "Industry and Waste"
-      elif  row['sector'] == "Land use sequestration":
-        df.at[index, 'sectoral_plan_sector'] = "Agriculture and Land"
-      else:
-        df.at[index, 'sectoral_plan_sector'] = "-"
-  else:
-
-    for index, row in df.iterrows():
-      if row['sector'] == "Power":
-        df.at[index, 'sectoral_plan_sector'] = "Electricity and Energy"
-      else:
-        df.at[index, 'sectoral_plan_sector'] = "-"
-
-  col_vars = [x for x in columns if isinstance(x, str)]
-  col_vals = [x for x in columns if isinstance(x, int)]
-  columns_new = col_vars + ['sectoral_plan_sector'] + col_vals
-  df = df[columns_new]
-
-  return df
-
-## Function to convert wide to long format
-def wide_to_long(df):
-  columns = df.columns.values.tolist()
-  col_vars = [x for x in columns if isinstance(x, str)]
-  col_vals = [x for x in columns if isinstance(x, int)]
-
-  df = pd.melt(df, id_vars=col_vars, value_vars = col_vals)
-  df = df.dropna(subset=['value'])
-  return df
-
-
-
-### Common columns for dataframes
-common_cols = ['scenario']
-if STATES == 'y':
-    common_cols.append('state')
-
-
-
-### Energy Processing - Transport
-# Get name of input to label output
-input_trans_filename = INPUT_TRA_FILENAME.split(".")[0]
-
-## Mapping input csv to output sector categories
-#Renaming columns sector_p to sector and enduse to subsector_detail and fuel to fuel_type
-energy_tra = energy_tra.rename(columns={"sector_p": "sector", "fuel": "fuel_type"})
-
-# Defining subsector detail based on enduse
-for index, row in energy_tra.iterrows():
-  i = eu_to_sd_dict['enduse'].index(energy_tra.at[index, "enduse"])
-  o = eu_to_sd_dict['subsector_detail'][i]
-  energy_tra.at[index, "subsector_detail"] = o
-
-# Defining subsector based on subsector detail
-energy_tra["subsector"] = ""
-for index, row in energy_tra.iterrows():
-  i = sd_to_s_dict['subsector_detail'].index(energy_tra.at[index, "subsector_detail"])
-  o = sd_to_s_dict['subsector'][i]
-  energy_tra.at[index, "subsector"] = o
-
-## Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','fuel_type','unit','year']
-energy_sum_trans = energy_tra.groupby(cols, sort=True)['val'].sum()
-energy_sum_trans_df = energy_sum_trans.to_frame()
-energy_summary_trans = pd.pivot_table(energy_sum_trans_df, values='val',index=cols[:-1], columns='year', aggfunc='sum')
-
-## Gap fill year data using linear interpolation
-energy_summary_trans = gap_fill_dataframe(energy_summary_trans)
-energy_summary_trans = energy_summary_trans.reset_index()
-print("Transport energy results processed")
-
-
-### Energy Processing - Commercial
-## Get name of input to label output
-input_com_filename = INPUT_COM_FILENAME.split(".")[0]
-
-## Mapping input csv to output sector categories
-# Setting sector names
-energy_com["sector"] = "Commercial buildings"
-
-# Setting fuel_type
-for index, row in energy_com.iterrows():
-  if energy_com.at[index, "fuel_override"] == "-":
-    energy_com.at[index, "fuel_type"] = energy_com.at[index, "fuel"]
-  else:
-    energy_com.at[index, "fuel_type"] = energy_com.at[index, "fuel_override"]
-
-# Add start fuel and end fuel for fuel switching processing
-energy_com["start_fuel"] = energy_com["fuel"]
-energy_com["end_fuel"] = energy_com["fuel_override"]
-
-# Mapping subsector
-energy_com["subsector"] = ""
-for index, row in energy_com.iterrows():
-  i = sp_to_s_dict['subsector_p'].index(energy_com.at[index, "buildingtype"])
-  o = sp_to_s_dict['subsector'][i]
-  energy_com.at[index, "subsector"] = o
-
-# Mapping subsector_detail
-energy_com["subsector_detail"] = ""
-for index, row in energy_com.iterrows():
-  i = eu_to_sd_dict['enduse'].index(energy_com.at[index, "enduse"])
-  o = eu_to_sd_dict['subsector_detail'][i]
-  energy_com.at[index, "subsector_detail"] = o
-
-# Set units
-energy_com["unit"] = "PJ"
-
-# Calculate energy demand optimised
-## Sort
-columns = energy_com.columns.values.tolist()
-remove_cols = ['val', 'val~den', 'varbl']
-sort_columns = [x for x in columns if x not in remove_cols]
-energy_com = energy_com.sort_values(by=sort_columns)
-
-
-## Calculate Eint
-value = 0
-for index, row in energy_com.iterrows():
-  if energy_com.at[index, "varbl"] == "IESTCS_EnInt":
-    value = energy_com.at[index, "val"]/energy_com.at[index, "val~den"]
-  elif energy_com.at[index, "varbl"] == "IESTCS_Out":
-    energy_com.at[index, "EInt"] = value
-    pass
-
-# Drop rows where data does not represent energy demand
-energy_com = energy_com.drop(energy_com[energy_com.varbl == "IESTCS_EnInt"].index)
-
-# Calculate energy demand
-energy_com["energy_demand"] = energy_com["val"]*energy_com["EInt"]
-
-# Create another dataframe for fuel switching processing
-energy_com_fs = energy_com
-
-## Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','fuel_type','unit','year']
-energy_sum_com = energy_com.groupby(cols, sort=True)['energy_demand'].sum()
-energy_sum_com_df = energy_sum_com.to_frame()
-energy_summary_com = pd.pivot_table(energy_sum_com_df, values='energy_demand',index=cols[:-1], columns='year', aggfunc='sum')
-
-
-## Gap fill year data using linear interpolation
-energy_summary_com = gap_fill_dataframe(energy_summary_com)
-energy_summary_com = energy_summary_com.reset_index()
-
-## Creating fuel switching output
-# Remove all rows that do not represent fuel switching
-energy_com_fs = energy_com_fs.drop(energy_com_fs[energy_com_fs.start_fuel == energy_com_fs.end_fuel].index)
-energy_com_fs = energy_com_fs.drop(energy_com_fs[energy_com_fs.end_fuel == "-"].index)
-# Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','start_fuel','end_fuel','unit','year']
-energy_com_fs = energy_com_fs.groupby(cols, sort=True)['energy_demand'].sum()
-energy_com_fs_df = energy_com_fs.to_frame()
-energy_summary_com_fs = pd.pivot_table(energy_com_fs_df, values='energy_demand',index=cols[:-1], columns='year', aggfunc='sum')
-# Gap fill year data using linear interpolation
-energy_summary_com_fs = gap_fill_dataframe(energy_summary_com_fs)
-energy_summary_com_fs = energy_summary_com_fs.reset_index()
-print("Commercial energy results processed")
-
-
-### Energy Processing - Residential
-## Get name of input to label ouput
-input_res_filename = INPUT_RES_FILENAME.split(".")[0]
-
-## Mapping input csv to output sector categories
-# Setting sector names
-energy_res["sector"] = "Residential buildings"
-
-# Add start fuel and end fuel for fuel switching processing
-energy_res["start_fuel"] = energy_res["fuel_switched"]
-energy_res["end_fuel"] = energy_res["fuel"]
-
-# Rename column fuel to fuel_type
-energy_res = energy_res.rename(columns={"fuel": "fuel_type"})
-
-## Residential
-# Mapping subsector
-energy_res["subsector"] = ""
-for index, row in energy_res.iterrows():
-  i = sp_to_s_dict['subsector_p'].index(energy_res.at[index, "subsector_p"])
-  o = sp_to_s_dict['subsector'][i]
-  energy_res.at[index, "subsector"] = o
-
-# Mapping subsector_detail
-energy_res["subsector_detail"] = ""
-for index, row in energy_res.iterrows():
-  i = eu_to_sd_dict['enduse'].index(energy_res.at[index, "enduse"])
-  o = eu_to_sd_dict['subsector_detail'][i]
-  energy_res.at[index, "subsector_detail"] = o
-
-# Create another dataframe for fuel switching processing
-energy_res_fs = energy_res
-
-## Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','fuel_type','unit','year']
-energy_sum_res = energy_res.groupby(cols, sort=True)['val'].sum()
-energy_sum_res_df = energy_sum_res.to_frame()
-energy_summary_res = pd.pivot_table(energy_sum_res_df, values='val',index=cols[:-1], columns='year', aggfunc='sum')
-
-## Gap fill year data using linear interpolation
-energy_summary_res = gap_fill_dataframe(energy_summary_res)
-energy_summary_res = energy_summary_res.reset_index()
-
-## Creating fuel switching output
-# Remove all rows that do not represent fuel switching
-energy_res_fs = energy_res_fs.drop(energy_res_fs[energy_res_fs.start_fuel == energy_res_fs.end_fuel].index)
-energy_res_fs = energy_res_fs.drop(energy_res_fs[energy_res_fs.end_fuel == "-"].index)
-energy_res_fs = energy_res_fs.drop(energy_res_fs[energy_res_fs.start_fuel == "-"].index)
-# Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','start_fuel','end_fuel','unit','year']
-energy_res_fs = energy_res_fs.groupby(cols, sort=True)['val'].sum()
-energy_res_fs_df = energy_res_fs.to_frame()
-energy_summary_res_fs = pd.pivot_table(energy_res_fs_df, values='val',index=cols[:-1], columns='year', aggfunc='sum')
-
-# Gap fill year data using linear interpolation
-energy_summary_res_fs = gap_fill_dataframe(energy_summary_res_fs)
-energy_summary_res_fs = energy_summary_res_fs.reset_index()
-print("Residential energy results processed")
-
-
-### Energy Processing - Industry
-## Get name of input to label output
-input_ind_filename = INPUT_IND_FILENAME.split(".")[0]
-
-## Mapping input csv to ouput sector categories
-# Setting sector names
-energy_ind["sector"] = "Industry"
-
-# Setting subsector detail
-energy_ind = energy_ind.rename(columns={'fuel': 'start_fuel', 'fuel_override': 'end_fuel', 'subsector_c': 'subsector_detail'})
-
-# Setting subsector
-for index, row in energy_ind.iterrows():
-  i = sd_to_s_dict['subsector_detail'].index(energy_ind.at[index, "subsector_detail"])
-  o = sd_to_s_dict['subsector'][i]
-  energy_ind.at[index, "subsector"] = o
-
-# Setting fuel_type for energy processing
-for index, row in energy_ind.iterrows():
-  if (energy_ind.at[index, "end_fuel"] == "-"):
-    energy_ind.at[index, "fuel_type"] = energy_ind.at[index, "start_fuel"]
-  else:
-    energy_ind.at[index, "fuel_type"] = energy_ind.at[index, "end_fuel"]
-
-# Set units
-energy_ind["unit"] = "PJ"
-
-# Calculate energy demand optimised
-## Sort
-columns = energy_ind.columns.values.tolist()
-remove_cols = ['val', 'val~den', 'varbl']
-sort_columns = [x for x in columns if x not in remove_cols]
-energy_ind = energy_ind.sort_values(by=sort_columns)
-
-## Calculate Eint
-value = 0
-for index, row in energy_ind.iterrows():
-  if energy_ind.at[index, "varbl"] == "IESTCS_EnInt":
-    value = energy_ind.at[index, "val"]/energy_ind.at[index, "val~den"]
-  elif energy_ind.at[index, "varbl"] == "IESTCS_Out":
-    energy_ind.at[index, "EInt"] = value
-    pass
-
-# Drop rows where data does not represent energy demand
-energy_ind = energy_ind.drop(energy_ind[energy_ind.varbl == "IESTCS_EnInt"].index)
-
-# Calculate energy demand
-energy_ind["energy_demand"] = energy_ind["val"]*energy_ind["EInt"]
-
-# Create another dataframe for fuel switching processing
-energy_ind_fs = energy_ind
-
-## Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','fuel_type','unit','year']
-energy_sum_ind = energy_ind.groupby(cols, sort=True)['energy_demand'].sum()
-energy_sum_ind_df = energy_sum_ind.to_frame()
-energy_summary_ind = pd.pivot_table(energy_sum_ind_df, values='energy_demand',index=cols[:-1], columns='year', aggfunc='sum')
-
-## Gap fill year data using linear interpolation
-energy_summary_ind = gap_fill_dataframe(energy_summary_ind)
-energy_summary_ind = energy_summary_ind.reset_index()
-
-## Creating fuel switching output
-# Remove all rows that do not represent fuel switching
-energy_ind_fs = energy_ind_fs.drop(energy_ind_fs[energy_ind_fs.start_fuel == energy_ind_fs.end_fuel].index)
-energy_ind_fs = energy_ind_fs.drop(energy_ind_fs[energy_ind_fs.end_fuel == "-"].index)
-# Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','start_fuel','end_fuel','unit','year']
-energy_ind_fs = energy_ind_fs.groupby(cols, sort=True)['energy_demand'].sum()
-energy_ind_fs_df = energy_ind_fs.to_frame()
-energy_summary_ind_fs = pd.pivot_table(energy_ind_fs_df, values='energy_demand',index=cols[:-1], columns='year', aggfunc='sum')
-# Gap fill year data using linear interpolation
-energy_summary_ind_fs = gap_fill_dataframe(energy_summary_ind_fs)
-energy_summary_ind_fs = energy_summary_ind_fs.reset_index()
-print("Industry energy results processed")
-
-
-### Energy processing - Electricity
-## Get name of input to label ouput
-input_elc_filename = INPUT_ELC_FILENAME.split(".")[0]
-
-## Set sector names
-energy_elc['sector'] = "Power"
-
-## Drop rows that do not represent input fuels (i.e. renewables and storage)
-energy_elc = energy_elc.drop(energy_elc[energy_elc.fuel == "Electricity"].index)
-energy_elc = energy_elc.drop(energy_elc[energy_elc.fuel == "Renewable"].index)
-energy_elc = energy_elc.drop(energy_elc[energy_elc.fuel == "Solar"].index)
-energy_elc = energy_elc.drop(energy_elc[energy_elc.fuel == "Wind"].index)
-
-## Set subsector names
-for index, row in energy_elc.iterrows():
-  i = t_to_s_dict['tech'].index(energy_elc.at[index, "tech"])
-  o = t_to_s_dict['technology'][i]
-  energy_elc.at[index, "subsector"] = o
-
-## Rename fuel to fuel_type
-energy_elc = energy_elc.rename(columns={"fuel": "fuel_type"})
-energy_elc['subsector_detail']=""
-
-## Calculate energy demand in PJ and rename units
-energy_elc['energy_demand'] = energy_elc['val']*3.6
-energy_elc['unit'] = 'PJ'
-
-## Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','fuel_type','unit','year']
-energy_sum_elc = energy_elc.groupby(cols, sort=True)['energy_demand'].sum()
-energy_sum_elc_df = energy_sum_elc.to_frame()
-energy_summary_elc = pd.pivot_table(energy_sum_elc_df, values='energy_demand',index=cols[:-1], columns='year', aggfunc='sum')
-
-## Gap fill year data using linear interpolation
-energy_summary_elc = gap_fill_dataframe(energy_summary_elc)
-energy_summary_elc = energy_summary_elc.reset_index()
-print("Electricity energy results processed")
-
-
-### Emissions
-## Get name of input to label ouput
-input_filename = INPUT_EMIS_FILENAME.split(".")[0]
-
-## Reading input files
-# Read veda report file
-core_emis_detail["sector"] = ""
-core_emis_detail["subsector"] = ""
-core_emis_detail["subsector_detail"] = ""
-core_emis_detail["emis_type"] = ""
-
-## Mapping input csv to ouput sector categories
-#Setting sector values
-for index, row in core_emis_detail.iterrows():
-  if row['sector_p'] == "LU_CO2seq" or row['sector_p'] == "DAC":
-    core_emis_detail.at[index, "sector"] = "Carbon dioxide removal"
-  elif row['sector_p'] == "Residential":
-    core_emis_detail.at[index, "sector"] = "Residential buildings"
-  elif row['sector_p'] == "Commercial":
-    core_emis_detail.at[index, "sector"] = "Commercial buildings"
-  else:
-    core_emis_detail.at[index, "sector"] = core_emis_detail.at[index, "sector_p"]
-
-# Setting subsector detail values
-for index, row in core_emis_detail.iterrows():
-  if row['sector'] == "Industry":
-    if row['subsector_p'] == "-" and row['subsector_c'] == "-":
-      if row['commodity'] == "UC_Bld_LU_CO2seq-":
-        core_emis_detail.at[index, "subsector_detail"] = "UC_Bld_LU_CO2seq-"
-      else:
-        core_emis_detail.at[index, "subsector_detail"] = "Unassigned energy emissions"
-    elif row['subsector_p'] == "-" and row['subsector_c'] != "-":
-      core_emis_detail.at[index, "subsector_detail"] = core_emis_detail.at[index, "subsector_c"]
-    else:
-      core_emis_detail.at[index, "subsector_detail"] = core_emis_detail.at[index, "subsector_p"]
-  elif row['sector'] == "Transport" or row['sector'] == "Residential buildings" or row['sector'] == "Commercial buildings":
-    i = eu_to_sd_dict['enduse'].index(core_emis_detail.at[index, "enduse"])
-    o = eu_to_sd_dict['subsector_detail'][i]
-    core_emis_detail.at[index, "subsector_detail"] = o
-  elif row['sector'] == "Carbon dioxide removal":
-    if row['sector_p'] == "LU_CO2seq":
-      core_emis_detail.at[index, "subsector_detail"] = "Land use sequestration"
-    elif row['sector_p'] == "DAC":
-      core_emis_detail.at[index, "subsector_detail"] = "Direct air capture"
-    else:
-      core_emis_detail.at[index, "subsector_detail"] = "-"
-  else:
-    core_emis_detail.at[index, "subsector_detail"] = "-"
-
-# Setting subsector values
-for index, row in core_emis_detail.iterrows():
-  if row['sector'] == "Residential buildings" or  row['sector'] == "Commercial buildings":
-    i = sp_to_s_dict['subsector_p'].index(core_emis_detail.at[index, "subsector_p"])
-    o = sp_to_s_dict['subsector'][i]
-    core_emis_detail.at[index, "subsector"] = o
-  elif row['sector'] == "Hydrogen":
-    core_emis_detail.at[index, "subsector"] = core_emis_detail.at[index, "tech"]
-  elif row['sector'] == "Carbon dioxide removal":
-    if row['subsector_detail'] == "Land use sequestration":
-      core_emis_detail.at[index, "subsector"] = "Land"
-    elif row['subsector_detail'] == "Direct air capture":
-      core_emis_detail.at[index, "subsector"] = "Engineered"
-    else:
-      core_emis_detail.at[index, "subsector"] = "-"
-  elif row['sector'] == "Power":
-    core_emis_detail.at[index, "subsector"] = core_emis_detail.at[index, "tech"]
-  elif row['sector'] == "Transport" or row['sector'] == "Industry":
-    i = sd_to_s_dict['subsector_detail'].index(core_emis_detail.at[index, "subsector_detail"])
-    o = sd_to_s_dict['subsector'][i]
-    core_emis_detail.at[index, "subsector"] = o
-  elif row['sector'] == "Carbon dioxide removal" and row['sector_p'] == "DAC":
-    core_emis_detail.at[index, "subsector"] = "Direct air capture"
-  else:
-    core_emis_detail.at[index, "subsector"] = "-"
-
-# Setting emission types
-for index, row in core_emis_detail.iterrows():
-  if row['sector'] == "Industry":
-    if row['varbl'] == "Emi_CO2":
-      if row['commodity'] == "INDCO2N":
-        core_emis_detail.at[index, "emis_type"] = "Energy"
-      elif row['commodity'] == "INDCO2P":
-        core_emis_detail.at[index, "emis_type"] = "Process"
-      else:
-        pass
-    elif row['varbl'] == "Cap_CO2":
-      core_emis_detail.at[index, "emis_type"] = "Capture"
-    elif row['varbl'] == "Emi_IndCO2_energy":
-      core_emis_detail.at[index, "emis_type"] = "Energy"
-  else:
-    i = com_to_et_dict['commodity'].index(core_emis_detail.at[index, "commodity"])
-    o = com_to_et_dict['emis_type'][i]
-    core_emis_detail.at[index, "emis_type"] = o
-
-# Drop Unassigned industry energy emissions as these represent duplicate
-core_emis_detail = core_emis_detail.drop(core_emis_detail[core_emis_detail.subsector_detail == "Unassigned energy emissions"].index)
-
-##Industry reclassifications
-# Reclassifying mineral carbonation and forestry and logging as carbon dioxide removal subsectors
-for index, row in core_emis_detail.iterrows():
-  if (row['sector'] == "Industry") and (row['source'] == "Process Negative Emissions"):
-    core_emis_detail.at[index, 'sector'] = "Carbon dioxide removal"
-    core_emis_detail.at[index, 'subsector'] = "Engineered"
-    core_emis_detail.at[index, 'subsector_detail'] = "Mineral carbonation"
-  elif (row['sector'] == "Industry") and (row['subsector'] == "Forestry and logging") and (row['emis_type'] == "Process"):
-    core_emis_detail.at[index, 'sector'] = "Carbon dioxide removal"
-    core_emis_detail.at[index, 'subsector'] = "Land"
-    core_emis_detail.at[index, 'subsector_detail'] = "Forestry and logging"
-    core_emis_detail.at[index, 'emis_type'] = 'Sequestration'
-
-core_emis_detail['units'] = "ktCO2e"
-
-## Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','emis_type','units','year']
-e_sum = core_emis_detail.groupby(cols, sort=True)['val'].sum()
-e_sum_df = e_sum.to_frame()
-emis_summary = pd.pivot_table(e_sum_df, values='val',index=cols[:-1], columns='year', aggfunc='sum')
-
-emis_summary = gap_fill_dataframe(emis_summary)
-emis_summary = emis_summary.reset_index()
-print("Emissions results processed")
-
-
-
-### Electricity generation and capacity
-# Get name of input to label ouput
-input_filename = INPUT_ELCG_FILENAME.split(".")[0]
-
-# Rename sector_p column to sector (all results in csv are for power)
-elec_cap_gen = elec_cap_gen.rename(columns={"sector_p": "sector"})
-
-# Mapping tech
-for index, row in elec_cap_gen.iterrows():
-  i = tech_to_technology_dict['tech'].index(elec_cap_gen.at[index, "tech"])
-  o = tech_to_technology_dict['technology'][i]
-  elec_cap_gen.at[index, "technology"] = o
-
-# Mapping tech detail
-for index, row in elec_cap_gen.iterrows():
-  process = elec_cap_gen.at[index, "process"]
-  process_code = ""
-  if "_" in process:
-    process = process.split("_")[1] # Remove prefix
-  else:
-    pass
-  if "-" in process:
-    process = process.split("-")[0] # Remove anything after dash
-  else:
-    pass
-  for char in process: # Strip process of digits
-    if (char.isdigit() == True):
-      pass
-    else:
-      process_code += char
-
-  if process_code in pc_to_td_dict['process_code']:
-    i = pc_to_td_dict['process_code'].index(process_code)
-    o = pc_to_td_dict['tech_detail'][i]
-    elec_cap_gen.at[index, "technology_detail"] = o
-  else:
-    elec_cap_gen.at[index, "technology_detail"] = "-"
-  elec_cap_gen.at[index, "process_code"] = process_code
-
-## Sum over years
-cols = common_cols + ['sector','technology','technology_detail','unit','year']
-elec_sum_cap_gen = elec_cap_gen.groupby(cols, sort=True)['val'].sum()
-elec_sum_cap_gen_df = elec_sum_cap_gen.to_frame()
-elec_summary_cap_gen = pd.pivot_table(elec_sum_cap_gen_df, values='val',index=cols[:-1], columns='year', aggfunc='sum')
-
-## Gap fill year data using linear interpolation
-elec_summary_cap_gen = gap_fill_dataframe(elec_summary_cap_gen)
-elec_summary_cap_gen = elec_summary_cap_gen.reset_index()
-print("Electricity gen/cap results processed")
-
-
-### Energy efficiency processing
-## Get name of input to label ouput
-input_ind_filename = INPUT_EnEff_IND_FILENAME.split(".")[0]
-input_bld_filename = INPUT_EnEff_BLD_FILENAME.split(".")[0]
-
-## Mapping input csv to ouput sector categories
-# Mapping sectors
-eneff_ind["sector"] = "Industry" #All entries in core eneff ind are industry (may want to split out ag as own sector in future)
-
-for index, row in eneff_bld.iterrows():
-  if eneff_bld.at[index, "sector_p"] == "Commercial":
-    eneff_bld.at[index, "sector"] = "Commercial buildings"
-  elif eneff_bld.at[index, "sector_p"] == "Residential":
-    eneff_bld.at[index, "sector"] = "Residential buildings"
-  else:
-    eneff_bld.at[index, "sector"] = "-"
-
-
-# Mapping subsector detail
-eneff_ind = eneff_ind.rename(columns={"subsector_p": "subsector_detail"})
-
-for index, row in eneff_bld.iterrows():
-  #print(eneff_bld.at[index, "enduse_c"])
-  i = eu_to_sd_dict['enduse'].index(eneff_bld.at[index, "enduse_c"])
-  o = eu_to_sd_dict['subsector_detail'][i]
-  eneff_bld.at[index, "subsector_detail"] = o
-
-# Mapping subsector
-for index, row in eneff_ind.iterrows():
-  i = sd_to_s_dict['subsector_detail'].index(eneff_ind.at[index, "subsector_detail"])
-  o = sd_to_s_dict['subsector'][i]
-  eneff_ind.at[index, "subsector"] = o
-
-for index, row in eneff_bld.iterrows():
-  i = sp_to_s_dict['subsector_p'].index(eneff_bld.at[index, "buildingtype"])
-  o = sp_to_s_dict['subsector'][i]
-  eneff_bld.at[index, "subsector"] = o
-
-# Mapping fuel
-eneff_ind = eneff_ind.rename(columns={"fuel": "fuel_type"})
-eneff_bld = eneff_bld.rename(columns={"fuel": "fuel_type"})
-
-# Mapping efficiency type
-eneff_ind = eneff_ind.rename(columns={"source": "efficiency_type"})
-eneff_bld['efficiency_type'] = "-" # No efficiency type provided in Core EnEff buildings
-
-# Mapping efficiency type
-for index, row in eneff_bld.iterrows():
-  if eneff_bld.at[index, "ee_category"] == "EE":
-    eneff_bld.at[index, "efficiency_category"] = "Commercial general"
-  elif eneff_bld.at[index, "ee_category"] == "EE new":
-    eneff_bld.at[index, "efficiency_category"] = "Residential new"
-  elif eneff_bld.at[index, "ee_category"] == "EE existing":
-    eneff_bld.at[index, "efficiency_category"] = "Residential existing"
-  else:
-    eneff_bld.at[index, "efficiency_category"] = "-"
-
-for index, row in eneff_ind.iterrows():
-  if eneff_ind.at[index, "ee_category"] == "Frontier levers":
-    eneff_ind.at[index, "efficiency_category"] = "Frontier levers"
-  elif eneff_ind.at[index, "ee_category"] == "EE 1":
-    eneff_ind.at[index, "efficiency_category"] = "Process improvements"
-  elif eneff_ind.at[index, "ee_category"] == "EE 2":
-    eneff_ind.at[index, "efficiency_category"] = "Small equipment upgrades"
-  elif eneff_ind.at[index, "ee_category"] == "EE 3":
-    eneff_ind.at[index, "efficiency_category"] = "Major equipment upgrades"
-  elif eneff_ind.at[index, "ee_category"] == "ETI":
-    eneff_ind.at[index, "efficiency_category"] = "ETI upgrade"
-  else:
-    eneff_ind.at[index, "efficiency_category"] = "-"
-
-## Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','fuel_type','efficiency_category','efficiency_type','unit','year']
-eneff_sum_ind = eneff_ind.groupby(cols, sort=True)['val'].sum()
-energy_sum_ind_df = eneff_sum_ind.to_frame()
-eneff_summary_ind = pd.pivot_table(energy_sum_ind_df, values='val',index=cols[:-1], columns='year', aggfunc='sum')
-
-eneff_sum_bld = eneff_bld.groupby(cols, sort=True)['val'].sum()
-energy_sum_bld_df = eneff_sum_bld.to_frame()
-eneff_summary_bld = pd.pivot_table(energy_sum_bld_df, values='val',index=cols[:-1], columns='year', aggfunc='sum')
-
-# Combine dataframes
-eneff_summary = pd.concat([eneff_summary_ind, eneff_summary_bld], axis=0)
-
-
-## Gap fill year data using linear interpolation
-eneff_summary = gap_fill_dataframe(eneff_summary)
-eneff_summary = eneff_summary.reset_index()
-print("Energy efficiency results processed")
-
-
-
-### H2 generation and capacity
-## Get name of input to label output
-input_filename = INPUT_H2GC_FILENAME.split(".")[0]
-
-## Mapping input csv to output sector categories
-# Mapping sectors
-H2_gen_cap["sector"] = H2_gen_cap["sector_p"]
-
-# Mapping subsector and subsector detail
-H2_gen_cap['subsector'] = ""
-H2_gen_cap['subsector_detail'] = ""
-for index, row in H2_gen_cap.iterrows():
-  p = row['process'].split("_")[1] + "_" + row['process'].split("_")[2]
-  #print(p)
-  if p == "SMR_ccs":
-    H2_gen_cap.at[index, "subsector"] = "Steam methane reforming"
-    H2_gen_cap.at[index, "subsector_detail"] = "Gas-SMR with CCS"
-  elif p == "elec_AE":
-    H2_gen_cap.at[index, "subsector"] = "Electrolysis"
-    H2_gen_cap.at[index, "subsector_detail"] = "Alkaline water electrolysis"
-  elif p == "elec_PEM":
-    H2_gen_cap.at[index, "subsector"] = "Electrolysis"
-    H2_gen_cap.at[index, "subsector_detail"] = "Proton exchange membrane electrolysis"
-  else:
-    H2_gen_cap.at[index, "subsector"] = "-"
-    H2_gen_cap.at[index, "subsector_detail"] = "-"
-
-## Rename value column
-H2_gen_cap = H2_gen_cap.rename(columns={"GrandTotal": "val"})
-
-## Sum over years
-cols = common_cols + ['sector','subsector','subsector_detail','unit','year']
-H2_gen_cap_sum = H2_gen_cap.groupby(by=cols, as_index=False, sort=True)['val'].sum()
-H2_gen_cap_summary = pd.pivot_table(H2_gen_cap_sum, values='val',index=cols[:-1], columns='year', aggfunc='sum')
-## Gap fill data
-H2_gen_cap_summary = gap_fill_dataframe(H2_gen_cap_summary)
-H2_gen_cap_summary = H2_gen_cap_summary.reset_index()
-print("Hydrogen gen/cap results processed")
-
-
-### Applying user defined options
-dfs = [energy_summary_trans, energy_summary_com, energy_summary_res, energy_summary_ind, energy_summary_elc,
-       energy_summary_com_fs, energy_summary_res_fs, energy_summary_ind_fs, emis_summary, elec_summary_cap_gen,
-       eneff_summary, H2_gen_cap_summary]
-if SECTORAL_PLANS == "y":
-  # for df in dfs:
-  #   df = add_sectoral_plan_mapping(df)
-  energy_summary_trans = add_sectoral_plan_mapping(energy_summary_trans)
-  energy_summary_com = add_sectoral_plan_mapping(energy_summary_com)
-  energy_summary_res = add_sectoral_plan_mapping(energy_summary_res)
-  energy_summary_ind = add_sectoral_plan_mapping(energy_summary_ind)
-  energy_summary_elc = add_sectoral_plan_mapping(energy_summary_elc)
-  energy_summary_com_fs = add_sectoral_plan_mapping(energy_summary_com_fs)
-  energy_summary_res_fs = add_sectoral_plan_mapping(energy_summary_res_fs)
-  energy_summary_ind_fs = add_sectoral_plan_mapping(energy_summary_ind_fs)
-  emis_summary = add_sectoral_plan_mapping(emis_summary)
-  elec_summary_cap_gen = add_sectoral_plan_mapping(elec_summary_cap_gen)
-  eneff_summary = add_sectoral_plan_mapping(eneff_summary)
-  H2_gen_cap_summary = add_sectoral_plan_mapping(H2_gen_cap_summary)
-  print("Sectoral mapping applied")
-else:
-  pass
-
-## Combine energy and fuel switching dataframes
-combined_energy = pd.concat([energy_summary_trans, energy_summary_com, energy_summary_res, energy_summary_ind, energy_summary_elc], axis=0)
-combined_fuelswitch = pd.concat([energy_summary_com_fs, energy_summary_res_fs, energy_summary_ind_fs])
-
-## Format
-if WIDE_OR_LONG == "l":
-  combined_energy = wide_to_long(combined_energy)
-  combined_fuelswitch = wide_to_long(combined_fuelswitch)
-  emis_summary = wide_to_long(emis_summary)
-  elec_summary_cap_gen = wide_to_long(elec_summary_cap_gen)
-  eneff_summary = wide_to_long(eneff_summary)
-  H2_gen_cap_summary = wide_to_long(H2_gen_cap_summary)
-else:
-  pass
-print("Results processing complete")
-
-### Exporting data files
-# Specify the nested directory structure
-nested_directory_path = Path("outputs/" + dt)
-
-# Create nested directories
-nested_directory_path.mkdir(parents=True, exist_ok=True)
-print(f"Files will be exported to '{nested_directory_path}'.")
-
-output_path = OUTPUT_PATH + nested_directory_path.name + "/"
-
-#Export csvs
-combined_energy.to_csv(output_path +  "energy" + ".csv", index=False)
-combined_fuelswitch.to_csv(output_path +  "fuel-switch" + ".csv", index=False)
-emis_summary.to_csv(output_path +  "emissions" + ".csv", index=False)
-elec_summary_cap_gen.to_csv(output_path +  "electricity-gen-cap" + ".csv", index=False)
-eneff_summary.to_csv(output_path +  "energy-efficiency" + ".csv", index=False)
-H2_gen_cap_summary.to_csv(output_path +  "hydrogen-generation-capacity" + ".csv", index=False)
-print("csv files exported")
-
-
-
-### Add to visualisation template
-if WIDE_OR_LONG == "w" and STATES == "y" and SECTORAL_PLANS == "n":
-  #Copy template
-  print("Copying excel visualisation template")
-  import shutil
-  template_path = r"T:\GitHub\cwc_austimes_results_processing\austimes-results-processing\templates\excel-viz-template.xlsx"
-  results_path = output_path +  "results-summary-with-visualisation" + ".xlsx"
-  shutil.copy2(template_path, results_path)
-  print("Excel visualisation template copied")
-
-  #Get scenario names
-  scenarios = sorted(core_emis_detail['scenario'].unique())
-  print("scenario names: ", scenarios)
-  # Write scenario names to workbook
-  book = load_workbook(results_path)
-  scenario_names = book["Scenario names"]
-  row = 3
-  for scenario in scenarios:
-    scenario_names.cell(row = row, column = 3).value = scenario
-    row += 1
-
-  book.save(results_path)
-  print("Scenario names added to excel sheet")
-
-  # Add sheets to workbook
-  book = load_workbook(results_path)
-  writer=pd.ExcelWriter(results_path, engine = 'openpyxl',mode='a',if_sheet_exists="overlay")
-
-  elec_summary_cap_gen.to_excel(writer, sheet_name = 'Elec', index=False)
-  H2_gen_cap_summary.to_excel(writer, sheet_name = 'H2', index=False)
-  eneff_summary.to_excel(writer, sheet_name = 'Energy eff', index=False)
-  combined_energy.to_excel(writer, sheet_name = 'Energy use', index=False)
-  emis_summary.to_excel(writer, sheet_name = 'Emis', index=False)
-  writer.close()
-else:
-  pass
-
-print("All files exported")
-
-
+            eint_list.append(None)
+    df['EInt'] = eint_list
+    df = df[df['varbl'] == 'IESTCS_Out']
+    df['energy_demand'] = df['val'] * df['EInt']
+    # Map subsector and detail
+    df['subsector_detail'] = df['subsector_c']
+    df['subsector'] = df['subsector_c'].map(map_sd2s)
+    # Group by start_fuel and end_fuel as per updated schema
+    group_cols = common_cols + ['sector', 'subsector', 'subsector_detail', 'start_fuel', 'end_fuel', 'unit']
+    df_summary = summarize(df, group_cols, 'energy_demand')
+    df_summary = gap_fill(df_summary).reset_index()
+    return df_summary
+
+# ----------------------------------------------
+# Generation Modules
+# ----------------------------------------------
+
+#Elec capacity and generation
+def process_elec_cap_gen():
+    df = pd.read_csv(INPUT_PATH / INPUT_FILES['elec_cap_gen'])
+    df = df.rename(columns={'sector_p':'sector'})
+    df['subsector_detail'] = df['tech'].map(map_t2tech)
+    df['subsector'] = df['technology0_process']
+    group_cols = common_cols + ['sector', 'subsector', 'subsector_detail', 'unit']
+    df_summary = summarize(df, group_cols, 'val')
+    df_summary = gap_fill(df_summary).reset_index()
+
+    return df_summary
+
+#H2 capacity and generation
+def process_h2():
+    df = pd.read_csv(INPUT_PATH / INPUT_FILES['h2'])
+    df = df.rename(columns={'fuel': 'sector'})
+    df['subsector_detail'] = df['process'].map(map_h2tech)
+    df['subsector'] = df['subsector_detail'].map(map_h2sector)
+
+    group_cols = common_cols + ['sector', 'subsector', 'subsector_detail', 'unit']
+    df_summary = summarize(df, group_cols, 'val')
+    df_summary = gap_fill(df_summary).reset_index()
+    return df_summary
+
+
+# ----------------------------------------------
+# Emissions Module
+# ----------------------------------------------
+def process_emis():
+    # 1. Load raw data
+    df = pd.read_csv(INPUT_PATH / INPUT_FILES['emissions'])
+
+    # 2. Top-level sector mapping
+    df['sector'] = df['sector_p'].map(map_emsector)
+
+    # 3. subsector_detail for Industry
+    mask_ind = df['sector']=='Industry'
+
+    # 3a. Try subsector_c
+    df.loc[mask_ind, 'subsector_detail'] = df.loc[mask_ind, 'subsector_c']
+
+    # 3b. Fallback to subsector_p_cca via your mapping file
+    missing = mask_ind & df['subsector_detail'].isin(['-', None, pd.NA])
+    df.loc[missing, 'subsector_detail'] = (
+    df.loc[missing, 'subsector_p_cca']
+      .map(map_spc2sd)                             # use mapping to change name
+      .fillna(df.loc[missing, 'subsector_p_cca'])  # if not in mapping, retain name from VEDA
+    )
+
+    # 3c. Final fallback label
+    still_blank = mask_ind & df['subsector_detail'].isin(['-', None, pd.NA])
+    df.loc[still_blank, 'subsector_detail'] = 'Unassigned emissions'
+
+    # 4. subsector for Industry
+    df.loc[mask_ind, 'subsector'] = (
+    df.loc[mask_ind, 'subsector_detail']
+      .map(map_sd2s)
+      .fillna('Unassigned emissions')
+    )
+    
+    # 5. Transport & Buildings
+    mask_bt = df['sector'].isin(['Transport','Residential buildings','Commercial buildings'])
+    df.loc[mask_bt, 'subsector_detail'] = df.loc[mask_bt, 'enduse'].map(map_enduse)
+    df.loc[mask_bt, 'subsector']        = df.loc[mask_bt, 'subsector_p'].map(map_sp2s)
+
+    # 6. Carbon removal
+    mask_cdr = df['sector']=='Carbon dioxide removal'
+    df.loc[mask_cdr & (df['sector_p']=='LU_CO2seq'),
+           'subsector_detail'] = 'Land use sequestration'
+    df.loc[mask_cdr & (df['sector_p']=='DAC'),
+           'subsector_detail'] = 'Direct air capture'
+    df.loc[mask_cdr & (df['subsector_detail']=='Land use sequestration'),
+           'subsector'] = 'Land'
+    df.loc[mask_cdr & (df['subsector_detail']=='Direct air capture'),
+           'subsector'] = 'Engineered'
+    df.loc[mask_cdr & ~df['subsector_detail'].isin(['Land use sequestration','Direct air capture']),
+           'subsector'] = '-'
+
+    # 7. Power & Hydrogen
+    df.loc[df['sector']=='Power',    'subsector'] = df['tech']
+    df.loc[df['sector']=='Hydrogen', 'subsector'] = df['tech']
+
+    # 8. Emission types
+    df['emis_type'] = df['commodity'].map(map_com2et).fillna('-')
+    ind = df['sector']=='Industry'
+    df.loc[ind & (df['varbl']=='Emi_CO2') & (df['commodity']=='INDCO2N'),
+           'emis_type'] = 'Energy'
+    df.loc[ind & (df['varbl']=='Emi_CO2') & (df['commodity']=='INDCO2P'),
+           'emis_type'] = 'Process'
+    df.loc[ind & (df['varbl']=='Cap_CO2'),
+           'emis_type'] = 'Capture'
+    df.loc[ind & (df['varbl']=='Emi_IndCO2_energy'),
+           'emis_type'] = 'Energy'
+
+    # 9. Industry negative/process removals
+    proc_neg = (df['sector']=='Industry') & (df['source_p']=='Process Negative Emissions')
+    df.loc[proc_neg, ['sector','subsector','subsector_detail','emis_type']] = [
+        'Carbon dioxide removal','Engineered','Mineral carbonation','Sequestration'
+    ]
+    forest_proc = (
+        (df['sector']=='Industry') &
+        (df['subsector']=='Forestry and logging') &
+        (df['emis_type']=='Process')
+    )
+    df.loc[forest_proc, ['sector','subsector','subsector_detail','emis_type']] = [
+        'Carbon dioxide removal','Land','Forestry and logging','Sequestration'
+    ]
+
+    # 10. Units
+    df['unit'] = 'ktCO2e'
+
+    # 11. Ensure no NaNs in grouping keys
+    all_cols = common_cols + ['sector','subsector','subsector_detail','emis_type','unit']
+    df[all_cols] = df[all_cols].fillna('-')
+
+     # 12. Pivot & gap-fill
+    emis_pivot = pd.pivot_table(
+        df, values='val',
+        index=common_cols + ['sector','subsector','subsector_detail','emis_type','unit'],
+        columns='year',
+        aggfunc='sum',
+        fill_value=0
+    )
+    emis_summary = gap_fill(emis_pivot).reset_index()   
+    return emis_summary
+
+# ---------------------------------------------
+# Processing and generating outputs
+# ---------------------------------------------
+if __name__ == '__main__':
+    # Process each module
+
+    ### Energy Use Modules ###
+    transport = process_energy_transport()
+    print('Transport energy processed')
+    commercial = process_energy_commercial()
+    print('Commercial energy processed')
+    residential = process_energy_residential()
+    print('Residential energy processed')
+    industry = process_energy_industry()
+    print('Industry energy processed')  
+    power = process_energy_power()
+    print('Power energy processed')
+    all_energy = pd.concat([transport, commercial, residential, industry, power], ignore_index=True)
+    
+    print('All energy use data processed')
+
+    ### Emissions Module ###
+    
+    emissions = process_emis()
+    print('Emissions data processed')
+
+    ### Generation modules ###
+    
+    h2 = process_h2()
+    elec_cap = process_elec_cap_gen()
+    print('All generation data processed')
+  
+    # Combine and export
+    output_dir = OUTPUT_PATH / f'{TIMESTAMP}'
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    all_energy.to_csv(output_dir / 'energy_all_sectors.csv', index=False)
+    elec_cap.to_csv(output_dir / 'elec_gen.csv', index=False)
+    h2.to_csv(output_dir / 'h2_gen.csv', index=False)
+    emissions.to_csv(output_dir / 'emissions.csv', index=False)
+
+    print('All sector energy data combined and exported')
+    print('Processing complete')

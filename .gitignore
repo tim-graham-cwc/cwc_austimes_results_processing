@@ -11,3 +11,8 @@
 /austimes-results-processing/outputs/*
 /austimes-results-processing/templates/excel-viz-template.xlsx
 /austimes-results-processing/templates/excel-viz-template-copy keep in case main file becomes corrupted.xlsx
+/austimes-results-processing/inputs
+/.idea
+/.idea
+/austimes-results-processing/__pycache__
+.idea/cwc_austimes_results_processing.iml

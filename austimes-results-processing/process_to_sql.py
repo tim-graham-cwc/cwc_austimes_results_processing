@@ -28,8 +28,6 @@ INPUT_IND_FILENAME = "FE_industry.csv"
 INPUT_ELC_FILENAME = "FE_power.csv"
 INPUT_EMIS_FILENAME = "CO2 emissions.csv"
 INPUT_ELCG_FILENAME = "Elec capacity and generation.csv"
-#INPUT_EnEff_IND_FILENAME = "CORE-EnEff Industry.csv"
-#INPUT_EnEff_BLD_FILENAME = "CORE-EnEff Buildings.csv"
 INPUT_H2GC_FILENAME = "H2 capacity and generation.csv"
 
 
