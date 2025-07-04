@@ -132,7 +132,7 @@ map_emsector = read_mapping('emis_sector_mapping.csv','sector0_process','sector'
 common_cols = ['scenario'] + (['state'] if STATES else [])
 
 # ---------------------------------------------
-# Processing Modules
+# Energy Use Modules
 # ---------------------------------------------
 
 #Transport
@@ -266,13 +266,26 @@ def process_energy_industry():
 #Elec capacity and generation
 def process_elec_cap_gen():
     df = pd.read_csv(INPUT_PATH / INPUT_FILES['elec_cap_gen'])
-    df = df.rename(columns={'sector_p':'sector'})
+    df = df.rename(columns={'sector_p': 'sector'})
+
+    # Initial mappings
     df['subsector_detail'] = df['tech'].map(map_t2tech)
     df['subsector'] = df['technology0_process']
+
+    # Define a function to find matching category based on substring in 'process'
+    def match_process_to_detail(row):
+        if row['subsector'] == 'Wind':
+            for key, value in map_pc2td.items():
+                if key in row['process']:
+                    return value
+        return row['subsector_detail']  # Return original if no match is found
+
+    # Apply the function across the DataFrame
+    df['subsector_detail'] = df.apply(match_process_to_detail, axis=1)
+
     group_cols = common_cols + ['sector', 'subsector', 'subsector_detail', 'unit']
     df_summary = summarize(df, group_cols, 'val')
     df_summary = gap_fill(df_summary).reset_index()
-
     return df_summary
 
 #H2 capacity and generation
@@ -403,24 +416,22 @@ if __name__ == '__main__':
     residential = process_energy_residential()
     print('Residential energy processed')
     industry = process_energy_industry()
-    print('Industry energy processed')  
+    print('Industry energy processed')
     power = process_energy_power()
     print('Power energy processed')
     all_energy = pd.concat([transport, commercial, residential, industry, power], ignore_index=True)
-    
+
     print('All energy use data processed')
 
     ### Emissions Module ###
-    
     emissions = process_emis()
     print('Emissions data processed')
 
-    ### Generation modules ###
-    
+    ### Generation Modules ###
     h2 = process_h2()
     elec_cap = process_elec_cap_gen()
     print('All generation data processed')
-  
+
     # Combine and export
     output_dir = OUTPUT_PATH / f'{TIMESTAMP}'
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -432,3 +443,39 @@ if __name__ == '__main__':
 
     print('All sector energy data combined and exported')
     print('Processing complete')
+
+    # ---------------------------------------------------------
+    # Put data into Excel visualisation template
+    # ---------------------------------------------------------
+
+    # Copy template
+    print("Copying excel visualisation template")
+    template_path = r"T:\\GitHub\\cwc_austimes_results_processing\\austimes-results-processing\\templates\\excel-viz-template.xlsx"
+    results_path = str(OUTPUT_PATH / "results-summary-with-visualisation.xlsx")
+    shutil.copy2(template_path, results_path)
+    print("Excel visualisation template copied")
+
+    # Get scenario names
+    scenarios = sorted(emissions['scenario'].unique())
+    print("Scenario names: ", scenarios)
+
+    # Write scenario names to workbook
+    book = load_workbook(results_path)
+    scenario_names = book["Scenario names"]
+    row = 3
+    for scenario in scenarios:
+        scenario_names.cell(row=row, column=3).value = scenario
+        row += 1
+
+    book.save(results_path)
+    print("Scenario names added to Excel sheet")
+
+    # Add additional sheets to workbook
+    writer = pd.ExcelWriter(results_path, engine='openpyxl', mode='a', if_sheet_exists="overlay")
+    elec_cap.to_excel(writer, sheet_name='Elec', index=False)
+    h2.to_excel(writer, sheet_name='H2', index=False)
+    all_energy.to_excel(writer, sheet_name='Energy use', index=False)
+    emissions.to_excel(writer, sheet_name='Emis', index=False)
+    writer.close()
+
+    print("All files exported")

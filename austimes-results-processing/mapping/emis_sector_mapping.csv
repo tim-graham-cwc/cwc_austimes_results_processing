@@ -1,9 +1,10 @@
 sector0_process,sector
 -,Unassigned emissions
-Buildings,Buildings
+Commercial,Buildings
 DAC,Carbon dioxide removal
 Hydrogen Production,Hydrogen production
 Industry,Industry
-Land Use,Agriculture and land use
+LU_CO2seq,Carbon dioxide removal
+Power,Power
+Residential,Buildings
 Transport,Transport
-Electricity,Power
